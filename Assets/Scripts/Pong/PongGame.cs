@@ -72,11 +72,37 @@ namespace Pong
             // Top and bottom walls
             float wallThickness = 0.2f;
             float halfHeight = playAreaHeight / 2f;
+            float halfWidth = playAreaWidth / 2f;
 
             CreateWall("TopWall", new Vector3(0, halfHeight + wallThickness / 2f, 0),
                 new Vector3(playAreaWidth, wallThickness, 1));
             CreateWall("BottomWall", new Vector3(0, -halfHeight - wallThickness / 2f, 0),
                 new Vector3(playAreaWidth, wallThickness, 1));
+
+            // Goal zones (behind paddles)
+            float goalWidth = 0.3f;
+            Color blueGoal = new Color(0.2f, 0.4f, 0.6f, 0.5f);   // left - blue scores here
+            Color orangeGoal = new Color(0.6f, 0.35f, 0.2f, 0.5f); // right - orange scores here
+
+            CreateGoalZone("LeftGoal", new Vector3(-halfWidth + goalWidth / 2f, 0, 1),
+                new Vector3(goalWidth, playAreaHeight, 1), blueGoal);
+            CreateGoalZone("RightGoal", new Vector3(halfWidth - goalWidth / 2f, 0, 1),
+                new Vector3(goalWidth, playAreaHeight, 1), orangeGoal);
+        }
+
+        private void CreateGoalZone(string name, Vector3 position, Vector3 scale, Color color)
+        {
+            GameObject zone = new GameObject(name);
+            zone.transform.position = position;
+            zone.transform.localScale = scale;
+
+            SpriteRenderer sr = zone.AddComponent<SpriteRenderer>();
+            Texture2D tex = new Texture2D(1, 1);
+            tex.SetPixel(0, 0, Color.white);
+            tex.Apply();
+            sr.sprite = Sprite.Create(tex, new Rect(0, 0, 1, 1), new Vector2(0.5f, 0.5f), 1);
+            sr.color = color;
+            sr.sortingOrder = -1; // behind everything else
         }
 
         private void CreateWall(string name, Vector3 position, Vector3 scale)
