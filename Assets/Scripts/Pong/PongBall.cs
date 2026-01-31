@@ -72,6 +72,11 @@ namespace Pong
             velocity.y = -velocity.y;
         }
 
+        public void BounceOffSideWall()
+        {
+            velocity.x = -velocity.x;
+        }
+
         public void BounceOffPaddle(float hitPosition, int direction)
         {
             // hitPosition is -1 to 1 (where on the paddle it hit)

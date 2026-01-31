@@ -26,10 +26,8 @@ namespace Pong
         private Camera mainCamera;
         private Dictionary<int, int> contactToPaddle = new Dictionary<int, int>();
 
-        private enum GameState { WaitingToStart, Playing, PointScored, GameOver }
+        private enum GameState { WaitingToStart, Playing, GameOver }
         private GameState state = GameState.WaitingToStart;
-        private float stateTimer;
-        private int lastScorer = -1;
 
         private void Awake()
         {
@@ -113,14 +111,6 @@ namespace Pong
                 case GameState.Playing:
                     UpdateBallCollisions();
                     CheckForScore();
-                    break;
-
-                case GameState.PointScored:
-                    stateTimer -= Time.deltaTime;
-                    if (stateTimer <= 0)
-                    {
-                        ServeBall();
-                    }
                     break;
 
                 case GameState.GameOver:
@@ -247,53 +237,48 @@ namespace Pong
         {
             Vector3 ballPos = ball.transform.position;
             float halfWidth = playAreaWidth / 2f;
+            float halfBallSize = settings.ballSize / 2f;
 
-            if (ballPos.x < -halfWidth)
+            if (ballPos.x - halfBallSize <= -halfWidth)
             {
-                // Right player scores
+                // Ball hit left wall - right player scores, ball bounces back
                 ScorePoint(1);
+                ball.BounceOffSideWall();
+                // Push ball away from wall
+                ball.transform.position = new Vector3(-halfWidth + halfBallSize + 0.05f, ballPos.y, ballPos.z);
             }
-            else if (ballPos.x > halfWidth)
+            else if (ballPos.x + halfBallSize >= halfWidth)
             {
-                // Left player scores
+                // Ball hit right wall - left player scores, ball bounces back
                 ScorePoint(0);
+                ball.BounceOffSideWall();
+                // Push ball away from wall
+                ball.transform.position = new Vector3(halfWidth - halfBallSize - 0.05f, ballPos.y, ballPos.z);
             }
         }
 
         private void ScorePoint(int playerIndex)
         {
             scores[playerIndex]++;
-            lastScorer = playerIndex;
             UpdateScoreDisplay();
 
-            ball.Stop();
-
+            // Check for winner
             if (scores[playerIndex] >= settings.winningScore)
             {
+                ball.Stop();
                 state = GameState.GameOver;
                 string winner = playerIndex == 0 ? "Blue" : "Orange";
                 ShowMessage($"{winner} Wins!\nTouch to Play Again");
             }
-            else
-            {
-                state = GameState.PointScored;
-                stateTimer = settings.serveDelay;
-                ShowMessage("");
-            }
+            // Ball keeps going - no reset!
         }
 
         private void StartGame()
         {
             state = GameState.Playing;
             ShowMessage("");
-            ServeBall();
-        }
-
-        private void ServeBall()
-        {
-            state = GameState.Playing;
-            // Serve toward the player who just scored (or random if first serve)
-            int direction = lastScorer == -1 ? (Random.value > 0.5f ? 1 : -1) : (lastScorer == 0 ? -1 : 1);
+            // Serve in random direction
+            int direction = Random.value > 0.5f ? 1 : -1;
             ball.Serve(direction);
         }
 
@@ -301,7 +286,6 @@ namespace Pong
         {
             scores[0] = 0;
             scores[1] = 0;
-            lastScorer = -1;
             UpdateScoreDisplay();
             StartGame();
         }
@@ -348,7 +332,7 @@ namespace Pong
                 style.normal.textColor = Color.white;
 
                 string msg = state == GameState.WaitingToStart ? "Touch to Start" :
-                             state == GameState.GameOver ? $"{(lastScorer == 0 ? "Blue" : "Orange")} Wins!\nTouch to Play Again" : "";
+                             state == GameState.GameOver ? $"{(scores[0] > scores[1] ? "Blue" : "Orange")} Wins!\nTouch to Play Again" : "";
 
                 GUI.Label(new Rect(Screen.width / 2 - 150, Screen.height / 2 - 40, 300, 80), msg, style);
             }
