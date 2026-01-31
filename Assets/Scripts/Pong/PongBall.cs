@@ -14,6 +14,8 @@ namespace Pong
 
         private SpriteRenderer spriteRenderer;
 
+        public Vector2 Velocity => velocity;
+
         public void Initialize(PongSettings gameSettings)
         {
             settings = gameSettings;
@@ -78,14 +80,25 @@ namespace Pong
             // Increase speed
             currentSpeed = Mathf.Min(currentSpeed + settings.ballSpeedIncrease, settings.maxBallSpeed);
 
-            // Calculate new angle based on where it hit the paddle
-            float angle = hitPosition * 60f * settings.paddleAngleInfluence;
-            angle *= Mathf.Deg2Rad;
+            // Curved paddle physics:
+            // - Center hit (0) = straight back
+            // - Edge hit (+/-1) = max angle (75 degrees)
+            float maxAngle = 75f * settings.paddleAngleInfluence;
+            float angle = hitPosition * maxAngle * Mathf.Deg2Rad;
 
-            velocity = new Vector2(
-                Mathf.Cos(angle) * direction,
-                Mathf.Sin(angle) + velocity.y * 0.5f
-            ).normalized * currentSpeed;
+            // Calculate new velocity
+            float vx = Mathf.Cos(angle) * direction;
+            float vy = Mathf.Sin(angle);
+
+            // Enforce minimum horizontal speed (prevent vertical bouncing)
+            float minHorizontal = 0.4f;
+            if (Mathf.Abs(vx) < minHorizontal)
+            {
+                vx = minHorizontal * direction;
+                vy = Mathf.Sqrt(1f - vx * vx) * Mathf.Sign(vy);
+            }
+
+            velocity = new Vector2(vx, vy).normalized * currentSpeed;
         }
 
         private Sprite CreateCircleSprite()

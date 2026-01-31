@@ -202,9 +202,9 @@ namespace Pong
                 ball.transform.position = new Vector3(ballPos.x, clampedY, ballPos.z);
             }
 
-            // Paddle collisions
-            CheckPaddleCollision(leftPaddle, ballPos, halfBallSize, -1);
-            CheckPaddleCollision(rightPaddle, ballPos, halfBallSize, 1);
+            // Paddle collisions (direction is where ball goes AFTER bounce)
+            CheckPaddleCollision(leftPaddle, ballPos, halfBallSize, 1);   // left paddle → ball goes right
+            CheckPaddleCollision(rightPaddle, ballPos, halfBallSize, -1); // right paddle → ball goes left
         }
 
         private void CheckPaddleCollision(PongPaddle paddle, Vector3 ballPos, float halfBallSize, int bounceDirection)
@@ -212,12 +212,22 @@ namespace Pong
             float paddleX = paddle.XPosition;
             float halfPaddleThickness = settings.paddleHeight / 2f;
 
-            // Check if ball is at paddle's X position
-            bool atPaddleX = bounceDirection == 1
-                ? ballPos.x + halfBallSize >= paddleX - halfPaddleThickness
-                : ballPos.x - halfBallSize <= paddleX + halfPaddleThickness;
+            // Determine if this is left or right paddle based on position
+            bool isLeftPaddle = paddleX < 0;
+
+            // Check if ball overlaps paddle's X range
+            bool atPaddleX = isLeftPaddle
+                ? ballPos.x - halfBallSize <= paddleX + halfPaddleThickness
+                : ballPos.x + halfBallSize >= paddleX - halfPaddleThickness;
 
             if (!atPaddleX) return;
+
+            // Check if ball is moving toward this paddle (not away)
+            bool movingToward = isLeftPaddle
+                ? ball.Velocity.x < 0
+                : ball.Velocity.x > 0;
+
+            if (!movingToward) return;
 
             // Check if paddle can reach the ball
             if (paddle.IsWithinReach(ballPos.y))
@@ -226,9 +236,9 @@ namespace Pong
                 ball.BounceOffPaddle(hitPosition, bounceDirection);
 
                 // Push ball away from paddle to prevent multiple hits
-                float newX = bounceDirection == 1
-                    ? paddleX - halfPaddleThickness - halfBallSize - 0.01f
-                    : paddleX + halfPaddleThickness + halfBallSize + 0.01f;
+                float newX = isLeftPaddle
+                    ? paddleX + halfPaddleThickness + halfBallSize + 0.05f
+                    : paddleX - halfPaddleThickness - halfBallSize - 0.05f;
                 ball.transform.position = new Vector3(newX, ballPos.y, ballPos.z);
             }
         }
