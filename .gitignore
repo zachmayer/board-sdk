@@ -21,3 +21,7 @@ Thumbs.db
 
 # Test results
 *.xml
+
+# Builds
+Build/
+*.apk
