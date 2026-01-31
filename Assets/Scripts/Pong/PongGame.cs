@@ -29,6 +29,12 @@ namespace Pong
         private enum GameState { WaitingToStart, Playing, GameOver }
         private GameState state = GameState.WaitingToStart;
 
+        // Audio
+        private AudioSource audioSource;
+        private AudioClip hitSound;
+        private AudioClip scoreSound;
+        private AudioClip winSound;
+
         private void Awake()
         {
             mainCamera = Camera.main;
@@ -40,9 +46,44 @@ namespace Pong
             // Create game objects
             CreateGameObjects();
 
+            // Initialize audio
+            CreateAudio();
+
             // Initialize UI
             UpdateScoreDisplay();
             ShowMessage("Touch to Start");
+        }
+
+        private void CreateAudio()
+        {
+            audioSource = gameObject.AddComponent<AudioSource>();
+            hitSound = CreateBeep(440f, 0.05f);   // A4, short
+            scoreSound = CreateBeep(220f, 0.15f); // A3, longer
+            winSound = CreateBeep(880f, 0.3f);    // A5, longest
+        }
+
+        private AudioClip CreateBeep(float frequency, float duration)
+        {
+            int sampleRate = 44100;
+            int sampleCount = (int)(sampleRate * duration);
+            float[] samples = new float[sampleCount];
+
+            for (int i = 0; i < sampleCount; i++)
+            {
+                float t = (float)i / sampleRate;
+                float envelope = 1f - (float)i / sampleCount; // fade out
+                samples[i] = Mathf.Sin(2f * Mathf.PI * frequency * t) * envelope * 0.3f;
+            }
+
+            AudioClip clip = AudioClip.Create("beep", sampleCount, 1, sampleRate, false);
+            clip.SetData(samples, 0);
+            return clip;
+        }
+
+        private void PlaySound(AudioClip clip)
+        {
+            if (settings.enableSound && audioSource != null)
+                audioSource.PlayOneShot(clip);
         }
 
         private void CreateGameObjects()
@@ -250,6 +291,7 @@ namespace Pong
             {
                 float hitPosition = paddle.GetHitPosition(ballPos.y);
                 ball.BounceOffPaddle(hitPosition, bounceDirection);
+                PlaySound(hitSound);
 
                 // Push ball away from paddle to prevent multiple hits
                 float newX = isLeftPaddle
@@ -295,8 +337,12 @@ namespace Pong
                 state = GameState.GameOver;
                 string winner = playerIndex == 0 ? "Blue" : "Orange";
                 ShowMessage($"{winner} Wins!\nTouch to Play Again");
+                PlaySound(winSound);
             }
-            // Ball keeps going - no reset!
+            else
+            {
+                PlaySound(scoreSound);
+            }
         }
 
         private void StartGame()

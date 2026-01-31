@@ -1,64 +1,59 @@
 # Pong for Board
 
-A minimal Pong game for the [Board](https://board.fun) tabletop gaming platform.
-
-## Status
-
-- [x] Basic Pong gameplay (ball, paddles, scoring)
-- [x] Board SDK touch input integration
-- [x] Tweakable settings via ScriptableObject
-- [x] Unit tests (edit mode + play mode)
-- [ ] Test on actual Board hardware
-- [ ] Add sound effects
-- [ ] Polish visuals
+Minimal Pong for the [Board](https://board.fun) tabletop gaming platform.
 
 ## Quick Start
 
 ```bash
-# In Unity
-1. Open project in Unity 6
-2. Menu: Board > Pong > Setup Scene
-3. Press Play
-4. Menu: Board > Input > Simulator
-5. Enable simulation, place fingers, drag to move paddles
+# In Unity 6
+1. Board > Pong > Setup Scene
+2. Press Play
+3. Board > Input > Simulator
+4. Enable simulation, drag fingers to move paddles
 ```
 
 ## Development
 
 ```bash
-make help       # Show all commands
-make test       # Run tests
-make build      # Verify compilation
-make clean      # Remove artifacts
+make help        # show commands
+make build       # verify compilation (close Unity first)
+make test        # run unit tests (close Unity first)
 ```
 
 ## Tweaking
 
-Menu: **Board > Pong > Open Settings** to adjust:
-- Ball speed, max speed
-- Paddle responsiveness, size
-- Winning score
-- Serve delay
+**Board > Pong > Open Settings** - changes apply in real-time:
 
-Changes apply in real-time during play.
+| Setting | Effect |
+|---------|--------|
+| Ball Speed | starting speed |
+| Ball Speed Increase | acceleration per hit |
+| Paddle Responsiveness | how fast paddle follows finger |
+| Paddle Angle Influence | 0 = straight, 1 = steep angles |
+| Winning Score | points to win |
+| Enable Sound | toggle audio |
 
 ## Files
 
 ```
 Assets/Scripts/Pong/
-├── PongSettings.cs      # Tweakable game settings
-├── PongGame.cs          # Main controller, Board SDK input
-├── PongBall.cs          # Ball movement
-├── PongPaddle.cs        # Paddle that follows touch
-├── Editor/
-│   └── PongEditorSetup.cs
-└── Tests/
-    ├── PongTests.cs           # Edit mode tests
-    └── PongPlayModeTests.cs   # Play mode tests
+├── PongGame.cs      # game loop, input, audio
+├── PongBall.cs      # ball physics
+├── PongPaddle.cs    # paddle movement
+├── PongSettings.cs  # tweakable settings
+└── Editor/
+    └── PongEditorSetup.cs  # menu commands
 ```
+
+## How It Works
+
+- Touch input via `BoardInput.GetActiveContacts(BoardContactType.Finger)`
+- Left side touches → blue paddle, right side → orange paddle
+- Ball bounces continuously, scores on back wall hits
+- First to winning score wins
 
 ## Board SDK
 
-- Touch input: `BoardInput.GetActiveContacts(BoardContactType.Finger)`
-- Screen: 1920x1080, coordinates in pixels
+- Screen: 1920×1080
 - Simulator: Board > Input > Simulator
+- Docs: https://docs.dev.board.fun

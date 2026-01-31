@@ -48,12 +48,12 @@ namespace Pong
         [Range(1, 21)]
         public int winningScore = 5;
 
-        [Tooltip("Delay before serving after a point")]
-        [Range(0.5f, 3f)]
-        public float serveDelay = 1.5f;
-
         [Tooltip("How much the ball angle changes based on where it hits the paddle")]
         [Range(0f, 1f)]
         public float paddleAngleInfluence = 0.5f;
+
+        [Header("Audio")]
+        [Tooltip("Enable sound effects")]
+        public bool enableSound = true;
     }
 }
