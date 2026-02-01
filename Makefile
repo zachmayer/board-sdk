@@ -7,7 +7,7 @@ BDB := $(PROJECT)/bin/bdb
 APK := $(PROJECT)/Build/Pong.apk
 RESULTS_DIR := /tmp/pong-tests
 
-.PHONY: help test test-edit test-play build build-mac build-android deploy logs clean
+.PHONY: help test test-edit test-play build build-mac build-android deploy logs stop bdb-status clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}'
@@ -52,11 +52,20 @@ build-android: ## Build Android APK for Board hardware (close Unity first)
 		-logFile -
 	@echo "Built: $(APK)"
 
-deploy: $(APK) ## Install APK to Board (connect Board first)
-	$(BDB) install $(APK)
+PACKAGE := com.DefaultCompany.Myproject
 
-logs: ## Show logs from Board
-	$(BDB) logs com.DefaultCompany.Myproject
+deploy: $(APK) ## Install and launch on Board
+	$(BDB) install $(APK)
+	$(BDB) launch $(PACKAGE)
+
+logs: ## Stream logs from Board (Ctrl+C to stop)
+	$(BDB) logs $(PACKAGE)
+
+stop: ## Stop app on Board
+	$(BDB) stop $(PACKAGE)
+
+bdb-status: ## Check Board connection
+	$(BDB) status
 
 clean: ## Remove test results and build artifacts
 	rm -rf $(RESULTS_DIR) "$(PROJECT)/Build"
