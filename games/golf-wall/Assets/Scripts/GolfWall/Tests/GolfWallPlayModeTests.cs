@@ -25,7 +25,7 @@ namespace GolfWall.Tests
             settings.clubLength = 1.0f;
             settings.clubWidth = 0.12f;
             settings.initialHeightFraction = 0.25f;
-            settings.wallThickness = 0.3f;
+            settings.wallThickness = 0.6f;
             settings.growthRate = 0.2f;
             settings.hitDetectionRadius = 0.8f;
             settings.wallXFraction = 0.67f;

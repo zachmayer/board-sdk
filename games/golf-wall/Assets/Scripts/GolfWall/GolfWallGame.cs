@@ -194,25 +194,91 @@ namespace GolfWall
 
         private void CreateLandingZone()
         {
-            landingZone = new GameObject("LandingZone");
-            var renderer = landingZone.AddComponent<SpriteRenderer>();
-            renderer.sprite = whiteSprite;
-            renderer.color = settings.landingZoneColor;
-            renderer.sortingOrder = -2;
-
-            float wallX = Mathf.Lerp(-playAreaWidth / 2f, playAreaWidth / 2f, settings.wallXFraction);
-            float wallRight = wallX + settings.wallThickness / 2f;
-            float rightEdge = playAreaWidth / 2f;
-            float rightWidth = rightEdge - wallRight;
-            float centerX = wallRight + rightWidth / 2f;
-            landingZone.transform.localScale = new Vector3(rightWidth, playAreaHeight, 1);
-            landingZone.transform.position = new Vector3(centerX, 0, 0);
+            // Landing zone is now just part of the background scenery
+            // No separate colored rectangle needed with pixel art backgrounds
         }
 
         private void CreateBackground()
         {
-            mainCamera.backgroundColor = settings.backgroundColor;
-            mainCamera.clearFlags = CameraClearFlags.SolidColor;
+            // Try to load Kenney pixel art backgrounds
+            Texture2D bg0 = Resources.Load<Texture2D>("Sprites/bg_green_0");
+            Texture2D bg1 = Resources.Load<Texture2D>("Sprites/bg_green_1");
+            Texture2D bg2 = Resources.Load<Texture2D>("Sprites/bg_green_2");
+            Texture2D grassTex = Resources.Load<Texture2D>("Sprites/grass");
+            Texture2D dirtTex = Resources.Load<Texture2D>("Sprites/dirt");
+
+            if (bg0 != null && bg1 != null && bg2 != null)
+            {
+                // Build composite background: 3 bands tiled horizontally
+                int tileSize = bg0.width; // 18px
+                int tilesX = Mathf.CeilToInt(playAreaWidth * 36f / tileSize) + 2;
+                int bandHeight = tileSize;
+                int texW = tilesX * tileSize;
+                int texH = bandHeight * 3;
+
+                Texture2D bgTex = new Texture2D(texW, texH);
+                bgTex.filterMode = FilterMode.Point;
+
+                Color[] pixels0 = bg0.GetPixels();
+                Color[] pixels1 = bg1.GetPixels();
+                Color[] pixels2 = bg2.GetPixels();
+
+                for (int tx = 0; tx < tilesX; tx++)
+                {
+                    bgTex.SetPixels(tx * tileSize, bandHeight * 2, tileSize, tileSize, pixels0); // top
+                    bgTex.SetPixels(tx * tileSize, bandHeight * 1, tileSize, tileSize, pixels1); // mid
+                    bgTex.SetPixels(tx * tileSize, 0, tileSize, tileSize, pixels2); // bottom
+                }
+                bgTex.Apply();
+
+                float ppu = texW / playAreaWidth;
+                var bgObj = new GameObject("Background");
+                var bgRenderer = bgObj.AddComponent<SpriteRenderer>();
+                bgRenderer.sprite = Sprite.Create(bgTex, new Rect(0, 0, texW, texH),
+                    new Vector2(0.5f, 0.5f), ppu);
+                bgRenderer.sortingOrder = -10;
+                bgObj.transform.position = new Vector3(0, 0, 0);
+
+                mainCamera.clearFlags = CameraClearFlags.SolidColor;
+                // Use the sky color from the top tile as camera clear color
+                mainCamera.backgroundColor = bg0.GetPixel(tileSize / 2, tileSize / 2);
+            }
+            else
+            {
+                mainCamera.backgroundColor = settings.backgroundColor;
+                mainCamera.clearFlags = CameraClearFlags.SolidColor;
+            }
+
+            // Ground strip using grass + dirt tiles
+            if (grassTex != null && dirtTex != null)
+            {
+                int tileSize = grassTex.width;
+                int tilesX = Mathf.CeilToInt(playAreaWidth * 36f / tileSize) + 2;
+                int texW = tilesX * tileSize;
+                int texH = tileSize * 2; // grass on top, dirt below
+
+                Texture2D groundTex = new Texture2D(texW, texH);
+                groundTex.filterMode = FilterMode.Point;
+
+                Color[] grassPixels = grassTex.GetPixels();
+                Color[] dirtPixels = dirtTex.GetPixels();
+
+                for (int tx = 0; tx < tilesX; tx++)
+                {
+                    groundTex.SetPixels(tx * tileSize, tileSize, tileSize, tileSize, grassPixels);
+                    groundTex.SetPixels(tx * tileSize, 0, tileSize, tileSize, dirtPixels);
+                }
+                groundTex.Apply();
+
+                float ppu = texW / playAreaWidth;
+                float groundHeight = (float)texH / ppu;
+                var groundObj = new GameObject("Ground");
+                var groundRenderer = groundObj.AddComponent<SpriteRenderer>();
+                groundRenderer.sprite = Sprite.Create(groundTex, new Rect(0, 0, texW, texH),
+                    new Vector2(0.5f, 1f), ppu); // pivot at top center
+                groundRenderer.sortingOrder = -5;
+                groundObj.transform.position = new Vector3(0, -playAreaHeight / 2f, 0);
+            }
         }
 
         private void Update()

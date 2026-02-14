@@ -67,8 +67,11 @@ namespace GolfWall
         public float wallXFraction = 0.67f;
 
         [Tooltip("Wall thickness in world units")]
-        [Range(0.1f, 0.5f)]
-        public float wallThickness = 0.3f;
+        [Range(0.3f, 1.5f)]
+        public float wallThickness = 0.6f;
+
+        [Tooltip("Pixels per world unit for wall tile rendering")]
+        public float wallTilePPU = 36f;
 
         [Tooltip("Growth rate for asymptotic wall height formula")]
         [Range(0.05f, 1f)]

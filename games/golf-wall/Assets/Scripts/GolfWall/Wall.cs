@@ -11,6 +11,9 @@ namespace GolfWall
         private float currentHeight;
         private float wallX;
 
+        private Texture2D brickTex;
+        private Texture2D brickTopTex;
+
         /// <summary>Top edge of the wall (ball must clear this Y to score).</summary>
         public float WallTopY => -playAreaHeight / 2f + currentHeight;
 
@@ -31,11 +34,20 @@ namespace GolfWall
             if (spriteRenderer == null)
                 spriteRenderer = gameObject.AddComponent<SpriteRenderer>();
 
-            Texture2D tex = new Texture2D(1, 1);
-            tex.SetPixel(0, 0, Color.white);
-            tex.Apply();
-            spriteRenderer.sprite = Sprite.Create(tex, new Rect(0, 0, 1, 1), new Vector2(0.5f, 0.5f), 1);
-            spriteRenderer.color = settings.wallColor;
+            // Load brick textures from Resources
+            brickTex = Resources.Load<Texture2D>("Sprites/brick");
+            brickTopTex = Resources.Load<Texture2D>("Sprites/brick_top");
+
+            // Fallback if textures not found
+            if (brickTex == null)
+            {
+                Debug.LogWarning("[Wall] brick texture not found, using solid color");
+                brickTex = new Texture2D(1, 1);
+                brickTex.SetPixel(0, 0, settings.wallColor);
+                brickTex.Apply();
+            }
+            if (brickTopTex == null)
+                brickTopTex = brickTex;
 
             SetWallForScore(0);
         }
@@ -46,12 +58,40 @@ namespace GolfWall
             currentHeight = CalculateWallHeight(score, playAreaHeight, settings.initialHeightFraction,
                 settings.growthRate, settings.ballSize);
 
-            // Wall is vertical: thin in X, tall in Y, anchored at bottom of screen
-            transform.localScale = new Vector3(settings.wallThickness, currentHeight, 1);
+            // Build a tiled brick texture for the wall
+            int tileSize = brickTex.width; // 18px
+            int tilesX = Mathf.Max(1, Mathf.CeilToInt(settings.wallThickness * settings.wallTilePPU / tileSize));
+            int tilesY = Mathf.Max(1, Mathf.CeilToInt(currentHeight * settings.wallTilePPU / tileSize));
+
+            int texW = tilesX * tileSize;
+            int texH = tilesY * tileSize;
+
+            Texture2D wallTex = new Texture2D(texW, texH);
+            wallTex.filterMode = FilterMode.Point;
+
+            Color[] bodyPixels = brickTex.GetPixels();
+            Color[] topPixels = brickTopTex.GetPixels();
+
+            for (int ty = 0; ty < tilesY; ty++)
+            {
+                Color[] pixels = (ty == tilesY - 1) ? topPixels : bodyPixels;
+                for (int tx = 0; tx < tilesX; tx++)
+                {
+                    wallTex.SetPixels(tx * tileSize, ty * tileSize, tileSize, tileSize, pixels);
+                }
+            }
+            wallTex.Apply();
+
+            float ppu = texW / settings.wallThickness;
+            spriteRenderer.sprite = Sprite.Create(wallTex,
+                new Rect(0, 0, texW, texH),
+                new Vector2(0.5f, 0f), // pivot at bottom center
+                ppu);
+            spriteRenderer.color = Color.white; // use texture colors, not tint
 
             // Position: at wallX, bottom aligned to screen bottom
-            float centerY = -halfHeight + currentHeight / 2f;
-            transform.position = new Vector3(wallX, centerY, 0);
+            transform.localScale = Vector3.one;
+            transform.position = new Vector3(wallX, -halfHeight, 0);
         }
 
         /// <summary>
