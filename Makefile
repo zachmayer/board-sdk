@@ -11,7 +11,14 @@ PONG_APK := $(PONG)/Build/Pong.apk
 PONG_PACKAGE := fun.board.pong
 RESULTS_DIR := /tmp/pong-tests
 
+# Golf Wall game
+GW := $(ROOT)/games/golf-wall
+GW_APK := $(GW)/Build/GolfWall.apk
+GW_PACKAGE := fun.board.golfwall
+GW_RESULTS_DIR := /tmp/golfwall-tests
+
 .PHONY: help test test-edit test-play build build-mac build-android setup-scene deploy logs stop bdb-status bdb-fix clean
+.PHONY: gw-test gw-test-edit gw-test-play gw-setup-scene gw-build-android gw-deploy gw-logs gw-clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}'
@@ -82,3 +89,41 @@ bdb-fix: ## Fix bdb macOS permissions
 clean: ## Remove test results and build artifacts
 	rm -rf $(RESULTS_DIR) "$(PONG)/Build"
 	rm -f /tmp/build.log
+
+# ============================================================
+# Golf Wall targets
+# ============================================================
+
+gw-test: gw-test-play ## Run Golf Wall tests (alias for gw-test-play)
+
+gw-test-play: ## Run Golf Wall tests (all tests run in play mode)
+	@mkdir -p $(GW_RESULTS_DIR)
+	$(UNITY) -batchmode -nographics -projectPath "$(GW)" \
+		-runTests -testPlatform PlayMode \
+		-testResults $(GW_RESULTS_DIR)/play.xml \
+		-logFile -
+	@echo "Results: $(GW_RESULTS_DIR)/play.xml"
+
+gw-setup-scene: ## Setup Golf Wall scene
+	$(UNITY) -batchmode -nographics -quit -projectPath "$(GW)" \
+		-executeMethod GolfWall.Editor.BatchSetup.SetupAndSave \
+		-logFile -
+	@echo "Golf Wall scene setup complete"
+
+gw-build-android: gw-setup-scene ## Build Golf Wall APK for Board
+	@mkdir -p "$(GW)/Build"
+	$(UNITY) -batchmode -nographics -quit -projectPath "$(GW)" \
+		-buildTarget Android \
+		-executeMethod GolfWall.Editor.BuildScript.Build \
+		-logFile -
+	@echo "Built: $(GW_APK)"
+
+gw-deploy: $(GW_APK) ## Install and launch Golf Wall on Board
+	$(BDB) install $(GW_APK)
+	$(BDB) launch $(GW_PACKAGE)
+
+gw-logs: ## Stream Golf Wall logs from Board
+	$(BDB) logs $(GW_PACKAGE)
+
+gw-clean: ## Remove Golf Wall build artifacts
+	rm -rf $(GW_RESULTS_DIR) "$(GW)/Build"
