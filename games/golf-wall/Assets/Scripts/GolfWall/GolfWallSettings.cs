@@ -12,7 +12,7 @@ namespace GolfWall
 
         [Tooltip("Gravity applied to ball (units/s²)")]
         [Range(1f, 30f)]
-        public float gravity = 12f;
+        public float gravity = 22f;
 
         [Tooltip("Multiplier from angular velocity to launch speed")]
         [Range(0.5f, 5f)]
@@ -20,7 +20,7 @@ namespace GolfWall
 
         [Tooltip("Minimum launch speed")]
         [Range(1f, 20f)]
-        public float minLaunchSpeed = 8f;
+        public float minLaunchSpeed = 11f;
 
         [Tooltip("Maximum launch speed")]
         [Range(10f, 40f)]
@@ -55,12 +55,16 @@ namespace GolfWall
 
         [Tooltip("Vertical position of tee base from bottom edge")]
         [Range(0.5f, 3f)]
-        public float teeBottomOffset = 1.5f;
+        public float teeBottomOffset = 0.8f;
 
         [Header("Wall Settings")]
         [Tooltip("Initial wall height as fraction of screen height")]
         [Range(0.2f, 0.8f)]
-        public float initialHeightFraction = 0.4f;
+        public float initialHeightFraction = 0.25f;
+
+        [Tooltip("Horizontal position of wall as fraction of screen width (0=left, 1=right)")]
+        [Range(0.3f, 0.8f)]
+        public float wallXFraction = 0.67f;
 
         [Tooltip("Wall thickness in world units")]
         [Range(0.1f, 0.5f)]

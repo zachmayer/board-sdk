@@ -4,6 +4,8 @@
 UNITY := /Applications/Unity/Hub/Editor/6000.3.8f1/Unity.app/Contents/MacOS/Unity
 ROOT := $(shell pwd)
 BDB := $(ROOT)/bin/bdb
+ADB := /Applications/Unity/Hub/Editor/6000.3.8f1/PlaybackEngines/AndroidPlayer/SDK/platform-tools/adb
+BOARD_IP := 192.168.1.203
 
 # Pong game
 PONG := $(ROOT)/games/pong
@@ -18,7 +20,8 @@ GW_PACKAGE := fun.board.golfwall
 GW_RESULTS_DIR := /tmp/golfwall-tests
 
 .PHONY: help test test-edit test-play build build-mac build-android setup-scene deploy logs stop bdb-status bdb-fix clean
-.PHONY: gw-test gw-test-edit gw-test-play gw-setup-scene gw-build-android gw-deploy gw-logs gw-clean
+.PHONY: gw-test gw-test-edit gw-test-play gw-setup-scene gw-build-android gw-deploy gw-deploy-wifi gw-logs gw-clean
+.PHONY: adb-connect adb-status
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}'
@@ -118,12 +121,26 @@ gw-build-android: gw-setup-scene ## Build Golf Wall APK for Board
 		-logFile -
 	@echo "Built: $(GW_APK)"
 
-gw-deploy: $(GW_APK) ## Install and launch Golf Wall on Board
+gw-deploy: $(GW_APK) ## Install and launch Golf Wall on Board (USB)
 	$(BDB) install $(GW_APK)
 	$(BDB) launch $(GW_PACKAGE)
+
+gw-deploy-wifi: $(GW_APK) ## Install and launch Golf Wall over WiFi (no cable)
+	$(ADB) install -r $(GW_APK)
+	$(ADB) shell am start -n $(GW_PACKAGE)/com.unity3d.player.UnityPlayerActivity
 
 gw-logs: ## Stream Golf Wall logs from Board
 	$(BDB) logs $(GW_PACKAGE)
 
 gw-clean: ## Remove Golf Wall build artifacts
 	rm -rf $(GW_RESULTS_DIR) "$(GW)/Build"
+
+# ============================================================
+# ADB / WiFi debugging targets
+# ============================================================
+
+adb-connect: ## Connect to Board over WiFi (run once after Board reboot)
+	$(ADB) connect $(BOARD_IP):5555
+
+adb-status: ## Check ADB connections (USB and WiFi)
+	$(ADB) devices

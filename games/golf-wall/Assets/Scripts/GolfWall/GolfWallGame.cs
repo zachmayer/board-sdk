@@ -21,16 +21,13 @@ namespace GolfWall
 
         private enum GameState { WaitingToStart, ReadyToSwing, BallInFlight }
         private GameState state = GameState.WaitingToStart;
+        private bool ballClearedWall;
 
-        // Piece tracking (smoothed)
+        // Piece tracking (raw, no smoothing for minimum latency)
         private GameObject pieceIndicator;
         private Vector3 pieceWorldPos;
-        private Vector3 smoothedPiecePos;
-        private float smoothedOrientationDeg; // Unity Z degrees
+        private float pieceOrientationDeg; // Unity Z degrees
         private bool pieceTracked;
-        private bool hasSmoothedPos;
-        private const float POS_SMOOTH_TAU = 0.07f;
-        private const float ROT_SMOOTH_TAU = 0.05f;
 
         // Club visual (child of pieceIndicator)
         private GameObject clubObject;
@@ -124,8 +121,10 @@ namespace GolfWall
             float halfWidth = playAreaWidth / 2f;
             float halfHeight = playAreaHeight / 2f;
 
-            // Tee X: fraction of the way from left edge toward wall (x=0)
-            float teeX = Mathf.Lerp(-halfWidth, 0, settings.teeXFraction);
+            // Wall X position
+            float wallX = Mathf.Lerp(-halfWidth, halfWidth, settings.wallXFraction);
+            // Tee X: fraction of the way from left edge toward wall
+            float teeX = Mathf.Lerp(-halfWidth, wallX, settings.teeXFraction);
             // Tee base Y: offset from bottom edge
             float teeBaseY = -halfHeight + settings.teeBottomOffset;
 
@@ -201,8 +200,11 @@ namespace GolfWall
             renderer.color = settings.landingZoneColor;
             renderer.sortingOrder = -2;
 
-            float rightWidth = playAreaWidth / 2f - settings.wallThickness / 2f;
-            float centerX = settings.wallThickness / 2f + rightWidth / 2f;
+            float wallX = Mathf.Lerp(-playAreaWidth / 2f, playAreaWidth / 2f, settings.wallXFraction);
+            float wallRight = wallX + settings.wallThickness / 2f;
+            float rightEdge = playAreaWidth / 2f;
+            float rightWidth = rightEdge - wallRight;
+            float centerX = wallRight + rightWidth / 2f;
             landingZone.transform.localScale = new Vector3(rightWidth, playAreaHeight, 1);
             landingZone.transform.position = new Vector3(centerX, 0, 0);
         }
@@ -259,7 +261,6 @@ namespace GolfWall
                 pieceTracked = false;
                 pieceIndicator.SetActive(false);
                 ResetAngularTracking();
-                hasSmoothedPos = false;
                 hasPrevClubTip = false;
                 return;
             }
@@ -271,42 +272,19 @@ namespace GolfWall
             rawPos.z = 0;
             pieceWorldPos = rawPos;
 
-            // Position smoothing (exponential moving average, frame-rate independent)
-            if (hasSmoothedPos)
-            {
-                float alpha = 1f - Mathf.Exp(-Time.deltaTime / POS_SMOOTH_TAU);
-                smoothedPiecePos = Vector3.Lerp(smoothedPiecePos, rawPos, alpha);
-            }
-            else
-            {
-                smoothedPiecePos = rawPos;
-                hasSmoothedPos = true;
-            }
-
-            // Orientation: SDK gives radians CW from vertical → Unity Z degrees CCW from +X
+            // Orientation: SDK gives radians → Unity Z degrees
             float sdkOrientationRad = contact.orientation;
-            float rawUnityZDeg = 90f - sdkOrientationRad * Mathf.Rad2Deg;
-
-            // Orientation smoothing
-            if (pieceTracked)
-            {
-                float alpha = 1f - Mathf.Exp(-Time.deltaTime / ROT_SMOOTH_TAU);
-                smoothedOrientationDeg = Mathf.LerpAngle(smoothedOrientationDeg, rawUnityZDeg, alpha);
-            }
-            else
-            {
-                smoothedOrientationDeg = rawUnityZDeg;
-            }
+            pieceOrientationDeg = 90f + sdkOrientationRad * Mathf.Rad2Deg;
 
             pieceTracked = true;
             pieceIndicator.SetActive(true);
-            pieceIndicator.transform.position = smoothedPiecePos;
-            pieceIndicator.transform.rotation = Quaternion.Euler(0, 0, smoothedOrientationDeg);
+            pieceIndicator.transform.position = rawPos;
+            pieceIndicator.transform.rotation = Quaternion.Euler(0, 0, pieceOrientationDeg);
 
             // Track club tip for swept hit detection
             Vector2 clubDir = (Vector2)pieceIndicator.transform.right;
             float tipRadius = settings.hitDetectionRadius + settings.clubLength;
-            Vector2 currTipPos = (Vector2)smoothedPiecePos + clubDir * tipRadius;
+            Vector2 currTipPos = (Vector2)pieceWorldPos + clubDir * tipRadius;
 
             if (!hasPrevClubTip)
             {
@@ -370,13 +348,13 @@ namespace GolfWall
                 // Update previous tip position even when not hitting
                 Vector2 clubDir = (Vector2)pieceIndicator.transform.right;
                 float tipRadius = settings.hitDetectionRadius + settings.clubLength;
-                prevClubTipPos = (Vector2)smoothedPiecePos + clubDir * tipRadius;
+                prevClubTipPos = (Vector2)pieceWorldPos + clubDir * tipRadius;
                 return;
             }
 
             Vector2 currClubDir = (Vector2)pieceIndicator.transform.right;
             float currTipRadius = settings.hitDetectionRadius + settings.clubLength;
-            Vector2 currTipPos = (Vector2)smoothedPiecePos + currClubDir * currTipRadius;
+            Vector2 currTipPos = (Vector2)pieceWorldPos + currClubDir * currTipRadius;
 
             Vector2 ballPos = (Vector2)teePosition;
             float ballRadius = settings.ballSize / 2f;
@@ -389,8 +367,8 @@ namespace GolfWall
             if (dist <= hitDist)
             {
                 Debug.Log($"[GolfWall] Club hit ball! angVel={peakAngularVelocity:F2} dist={dist:F3} " +
-                    $"clubAngle={smoothedOrientationDeg:F0}°");
-                LaunchBallFromClub(absAngVel, currClubDir);
+                    $"clubAngle={pieceOrientationDeg:F0}°");
+                LaunchBallFromClub(peakAngularVelocity, currClubDir);
             }
 
             prevClubTipPos = currTipPos;
@@ -411,25 +389,30 @@ namespace GolfWall
             return Vector2.Distance(p, closest);
         }
 
-        private void LaunchBallFromClub(float angularSpeed, Vector2 clubDir)
+        private void LaunchBallFromClub(float signedAngularVelocity, Vector2 clubDir)
         {
-            // Speed: tangential velocity of club tip = angular velocity * tip radius
+            // Speed: tangential velocity of club tip = |angular velocity| * tip radius
             float tipRadius = settings.hitDetectionRadius + settings.clubLength;
-            float tipSpeed = angularSpeed * tipRadius;
+            float tipSpeed = Mathf.Abs(signedAngularVelocity) * tipRadius;
             float speed = Mathf.Clamp(tipSpeed * settings.powerMultiplier,
                 settings.minLaunchSpeed, settings.maxLaunchSpeed);
 
-            // Direction: perpendicular to club, pick the one that goes more upper-right
+            // Direction: tangential velocity of tip = omega * perpCCW(clubDir)
+            // perpCCW = (-dy, dx). Sign of omega naturally flips the direction.
             Vector2 perpCCW = new Vector2(-clubDir.y, clubDir.x);
-            Vector2 perpCW = new Vector2(clubDir.y, -clubDir.x);
-            Vector2 desired = new Vector2(1f, 1f).normalized;
-            Vector2 launchDir = Vector2.Dot(perpCCW, desired) >= Vector2.Dot(perpCW, desired)
-                ? perpCCW : perpCW;
+            Vector2 launchDir = perpCCW * Mathf.Sign(signedAngularVelocity);
 
-            // Clamp launch angle to [30°, 80°] from horizontal to ensure ball arcs over wall
+            // If ball would go downward, don't launch (bad swing direction)
+            if (launchDir.y < 0.1f)
+            {
+                Debug.Log($"[GolfWall] Swing direction wrong (launchDir.y={launchDir.y:F2}), not launching");
+                return;
+            }
+
+            // Clamp launch angle to [15°, 165°] — must go upward, allow wide range
             float launchAngle = Mathf.Atan2(launchDir.y, launchDir.x);
-            float minAngle = 30f * Mathf.Deg2Rad;
-            float maxAngle = 80f * Mathf.Deg2Rad;
+            float minAngle = 15f * Mathf.Deg2Rad;
+            float maxAngle = 165f * Mathf.Deg2Rad;
             launchAngle = Mathf.Clamp(launchAngle, minAngle, maxAngle);
             launchDir = new Vector2(Mathf.Cos(launchAngle), Mathf.Sin(launchAngle));
 
@@ -441,6 +424,7 @@ namespace GolfWall
 
             ball.Launch(teePosition, launchVelocity);
             state = GameState.BallInFlight;
+            ballClearedWall = false;
             ShowMessage("");
 
             PlaySound(hitSound);
@@ -480,35 +464,43 @@ namespace GolfWall
                 return;
             }
 
-            // --- Scoring: ball cleared the wall ---
-            if (ballPos.x - halfBall > wall.WallRightX)
+            // --- Ball cleared the wall (mark it, let it keep flying) ---
+            if (!ballClearedWall && ballPos.x - halfBall > wall.WallRightX)
             {
-                Score();
-                return;
+                ballClearedWall = true;
+                PlaySound(scoreSound);
+                Debug.Log("[GolfWall] Ball cleared the wall!");
             }
 
             // --- Screen bounds ---
+            // Left wall bounce
             if (ballPos.x - halfBall <= -halfWidth)
             {
                 ball.BounceOffWall();
                 ball.SnapPosition(new Vector3(-halfWidth + halfBall + 0.01f, ballPos.y, 0));
             }
 
+            // Right wall bounce
             if (ballPos.x + halfBall >= halfWidth)
             {
-                Score();
-                return;
+                ball.BounceOffWall();
+                ball.SnapPosition(new Vector3(halfWidth - halfBall - 0.01f, ballPos.y, 0));
             }
 
+            // Ceiling bounce
             if (ballPos.y + halfBall >= halfHeight)
             {
                 ball.BounceOffTopBottom();
                 ball.SnapPosition(new Vector3(ballPos.x, halfHeight - halfBall - 0.01f, 0));
             }
 
+            // Floor: score if cleared wall, miss if didn't
             if (ballPos.y - halfBall <= -halfHeight)
             {
-                BallMissed();
+                if (ballClearedWall)
+                    Score();
+                else
+                    BallMissed();
                 return;
             }
         }

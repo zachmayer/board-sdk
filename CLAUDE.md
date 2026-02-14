@@ -89,10 +89,47 @@ Games MUST implement the Board pause menu to allow users to exit:
 
 ## Board Hardware Deploy Workflow
 
-1. Board does NOT need a separate "developer mode" — the dev service runs automatically. Just connect via USB-C accessory port.
-2. Connect Board to computer
-3. `make bdb-status` to verify connection
-4. `make deploy`
+### USB Deploy (default)
+1. Connect Board via USB-C accessory port
+2. `make bdb-status` to verify connection
+3. `make deploy`
+
+### WiFi Deploy (no cable needed)
+
+Once set up, you can build and deploy without a USB cable:
+```bash
+make gw-build-android    # build the APK
+make gw-deploy-wifi      # install and launch over WiFi
+make adb-status          # check WiFi connection
+make adb-connect         # reconnect after Board reboot
+```
+
+**One-time setup** (requires USB cable the first time):
+
+1. Connect Board via USB-C cable
+2. `bdb launch com.android.settings` to open Android settings on the Board's screen
+3. Scroll to the bottom, tap **System**
+4. Tap **About phone**
+5. Tap **Build number** 7 times — you'll see "You are now a developer"
+6. Go back to **System** → **Developer options** (new menu item)
+7. Turn ON:
+   - **USB debugging**
+   - **Wireless debugging**
+   - **Disable ADB authorization timeout** (so you don't have to re-auth)
+8. A prompt will appear on the Board screen: "Allow USB debugging?" — tap **Always allow from this computer**, then **Allow**
+9. From your Mac, enable TCP mode and connect:
+   ```bash
+   ADB=/Applications/Unity/Hub/Editor/6000.3.8f1/PlaybackEngines/AndroidPlayer/SDK/platform-tools/adb
+   $ADB tcpip 5555
+   $ADB connect 192.168.1.203:5555   # Board IP (may change with DHCP)
+   ```
+10. Unplug the USB cable — WiFi deploy now works
+
+**Notes:**
+- `bdb` only works over USB serial. `adb` works over USB or WiFi. They don't conflict.
+- After Board reboot, re-run `make adb-connect` to reconnect WiFi.
+- Board IP is currently `192.168.1.203` but may change if DHCP assigns a new address.
+- To find the Board's current IP: plug in USB, run `$ADB shell ip addr show wlan0`.
 
 ## Conventions
 
@@ -115,6 +152,9 @@ When setting up on a new machine:
 ## Current Status
 
 - Pong deployed and running on Board hardware (Harris_Hill_Products B5438, OS 1.4.7)
+- Golf Wall deployed — golf game using glyph piece detection for swing input
 - Pause screen integration implemented (BoardApplication.Exit() + resume handling)
 - bdb CLI is working (signed and permissions fixed)
+- USB debugging and WiFi debugging enabled on Board (Developer options unlocked)
+- WiFi ADB confirmed working at 192.168.1.203:5555
 - Board does NOT need developer mode — the dev service runs automatically on all retail Boards

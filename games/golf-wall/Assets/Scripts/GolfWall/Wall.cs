@@ -9,21 +9,23 @@ namespace GolfWall
         private float playAreaWidth;
         private float playAreaHeight;
         private float currentHeight;
+        private float wallX;
 
         /// <summary>Top edge of the wall (ball must clear this Y to score).</summary>
         public float WallTopY => -playAreaHeight / 2f + currentHeight;
 
         /// <summary>Left face X of the wall.</summary>
-        public float WallLeftX => transform.position.x - settings.wallThickness / 2f;
+        public float WallLeftX => wallX - settings.wallThickness / 2f;
 
         /// <summary>Right face X of the wall.</summary>
-        public float WallRightX => transform.position.x + settings.wallThickness / 2f;
+        public float WallRightX => wallX + settings.wallThickness / 2f;
 
         public void Initialize(GolfWallSettings gameSettings, float areaWidth, float areaHeight)
         {
             settings = gameSettings;
             playAreaWidth = areaWidth;
             playAreaHeight = areaHeight;
+            wallX = Mathf.Lerp(-areaWidth / 2f, areaWidth / 2f, settings.wallXFraction);
 
             spriteRenderer = GetComponent<SpriteRenderer>();
             if (spriteRenderer == null)
@@ -47,9 +49,9 @@ namespace GolfWall
             // Wall is vertical: thin in X, tall in Y, anchored at bottom of screen
             transform.localScale = new Vector3(settings.wallThickness, currentHeight, 1);
 
-            // Position: centered at x=0, bottom aligned to screen bottom
+            // Position: at wallX, bottom aligned to screen bottom
             float centerY = -halfHeight + currentHeight / 2f;
-            transform.position = new Vector3(0, centerY, 0);
+            transform.position = new Vector3(wallX, centerY, 0);
         }
 
         /// <summary>

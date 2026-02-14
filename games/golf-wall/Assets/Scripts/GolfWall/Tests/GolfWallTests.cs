@@ -10,15 +10,15 @@ namespace GolfWall.Tests
         {
             var settings = ScriptableObject.CreateInstance<GolfWallSettings>();
             settings.ballSize = 0.4f;
-            settings.gravity = 12f;
+            settings.gravity = 22f;
             settings.powerMultiplier = 2f;
-            settings.minLaunchSpeed = 8f;
+            settings.minLaunchSpeed = 11f;
             settings.maxLaunchSpeed = 18f;
             settings.wallBounceDamping = 0.7f;
             settings.angularVelocityThreshold = 4f;
             settings.clubLength = 1.0f;
             settings.clubWidth = 0.12f;
-            settings.initialHeightFraction = 0.4f;
+            settings.initialHeightFraction = 0.25f;
             settings.wallThickness = 0.3f;
             settings.growthRate = 0.2f;
             settings.hitDetectionRadius = 0.8f;

@@ -16,18 +16,19 @@ namespace GolfWall.Tests
         {
             settings = ScriptableObject.CreateInstance<GolfWallSettings>();
             settings.ballSize = 0.4f;
-            settings.gravity = 12f;
+            settings.gravity = 22f;
             settings.powerMultiplier = 2f;
-            settings.minLaunchSpeed = 8f;
+            settings.minLaunchSpeed = 11f;
             settings.maxLaunchSpeed = 18f;
             settings.wallBounceDamping = 0.7f;
             settings.angularVelocityThreshold = 4f;
             settings.clubLength = 1.0f;
             settings.clubWidth = 0.12f;
-            settings.initialHeightFraction = 0.4f;
+            settings.initialHeightFraction = 0.25f;
             settings.wallThickness = 0.3f;
             settings.growthRate = 0.2f;
             settings.hitDetectionRadius = 0.8f;
+            settings.wallXFraction = 0.67f;
             settings.wallColor = Color.gray;
             settings.ballColor = Color.white;
             settings.pieceIndicatorColor = new Color(0.3f, 0.8f, 0.3f, 0.3f);
@@ -173,8 +174,9 @@ namespace GolfWall.Tests
 
             yield return null;
 
-            Assert.AreEqual(0f, wallObj.transform.position.x, 0.01f,
-                "Wall should be centered at x=0");
+            float expectedWallX = Mathf.Lerp(-playAreaWidth / 2f, playAreaWidth / 2f, settings.wallXFraction);
+            Assert.AreEqual(expectedWallX, wallObj.transform.position.x, 0.01f,
+                "Wall should be at wallXFraction position");
 
             float expectedHeight = Wall.CalculateWallHeight(0, playAreaHeight,
                 settings.initialHeightFraction, settings.growthRate, settings.ballSize);
