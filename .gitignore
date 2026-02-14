@@ -25,3 +25,8 @@ Thumbs.db
 # Builds
 Build/
 *.apk
+
+# Python
+__pycache__/
+*.pyc
+.venv/
