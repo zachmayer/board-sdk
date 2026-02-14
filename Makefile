@@ -1,7 +1,7 @@
 # Board Games - Makefile
 # Run `make` or `make help` to see available targets
 
-UNITY := /Applications/Unity/Hub/Editor/6000.3.6f1/Unity.app/Contents/MacOS/Unity
+UNITY := /Applications/Unity/Hub/Editor/6000.3.8f1/Unity.app/Contents/MacOS/Unity
 ROOT := $(shell pwd)
 BDB := $(ROOT)/bin/bdb
 

@@ -49,7 +49,7 @@ make bdb-fix           # fix bdb macOS permissions on a new machine
 
 ## Board Hardware Deploy Workflow
 
-1. Board must be in **developer mode** (check Board docs at docs.dev.board.fun)
+1. Board does NOT need a separate "developer mode" — the dev service runs automatically. Just connect via USB-C accessory port.
 2. Connect Board to computer
 3. `make bdb-status` to verify connection
 4. `make deploy`
