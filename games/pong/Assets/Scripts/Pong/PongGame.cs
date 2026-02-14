@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using Board.Input;
+using Board.Core;
 using System.Collections.Generic;
 
 namespace Pong
@@ -59,9 +60,32 @@ namespace Pong
             // Initialize audio
             CreateAudio();
 
+            // Configure Board pause screen
+            BoardApplication.SetPauseScreenContext(applicationName: "Pong");
+            BoardApplication.pauseScreenActionReceived += OnPauseAction;
+
             // Initialize UI
             UpdateScoreDisplay();
             ShowMessage("Touch to Start");
+        }
+
+        private void OnPauseAction(BoardPauseAction action, BoardPauseAudioTrack[] audioTracks)
+        {
+            switch (action)
+            {
+                case BoardPauseAction.Resume:
+                    Time.timeScale = 1f;
+                    break;
+                case BoardPauseAction.ExitGameUnsaved:
+                case BoardPauseAction.ExitGameSaved:
+                    BoardApplication.Exit();
+                    break;
+            }
+        }
+
+        private void OnDestroy()
+        {
+            BoardApplication.pauseScreenActionReceived -= OnPauseAction;
         }
 
         private void CreateAudio()

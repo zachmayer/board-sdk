@@ -100,7 +100,7 @@ Games MUST implement the Board pause menu to allow users to exit:
 - Tooling/scripts: Python (>=3.13)
 - Board SDK input: use `BoardInput.GetActiveContacts()` from `Board.Input` namespace
 - Build automation: Makefile per game project
-- Package name for pong is currently `com.DefaultCompany.Myproject` (needs updating in Unity project settings)
+- Package name for pong: `fun.board.pong`
 
 ## New Machine Setup
 
@@ -115,7 +115,6 @@ When setting up on a new machine:
 ## Current Status
 
 - Pong deployed and running on Board hardware (Harris_Hill_Products B5438, OS 1.4.7)
-- TODO: Implement pause screen integration (BoardApplication.Exit()) — currently users can't exit game
-- TODO: Update package name from `com.DefaultCompany.Myproject`
+- Pause screen integration implemented (BoardApplication.Exit() + resume handling)
 - bdb CLI is working (signed and permissions fixed)
 - Board does NOT need developer mode — the dev service runs automatically on all retail Boards

@@ -8,7 +8,7 @@ BDB := $(ROOT)/bin/bdb
 # Pong game
 PONG := $(ROOT)/games/pong
 PONG_APK := $(PONG)/Build/Pong.apk
-PONG_PACKAGE := com.DefaultCompany.Myproject
+PONG_PACKAGE := fun.board.pong
 RESULTS_DIR := /tmp/pong-tests
 
 .PHONY: help test test-edit test-play build build-mac build-android setup-scene deploy logs stop bdb-status bdb-fix clean
