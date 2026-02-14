@@ -16,8 +16,9 @@ namespace GolfWall.Tests
             settings.maxLaunchSpeed = 18f;
             settings.wallBounceDamping = 0.7f;
             settings.angularVelocityThreshold = 4f;
-            settings.baseLaunchAngle = 55f;
-            settings.initialHeightFraction = 0.5f;
+            settings.clubLength = 1.0f;
+            settings.clubWidth = 0.12f;
+            settings.initialHeightFraction = 0.4f;
             settings.wallThickness = 0.3f;
             settings.growthRate = 0.2f;
             settings.hitDetectionRadius = 0.8f;
@@ -28,13 +29,12 @@ namespace GolfWall.Tests
         public void WallHeight_Score0_ReturnsInitialPosition()
         {
             float playAreaHeight = 10f;
-            float initialFraction = 0.5f;
+            float initialFraction = 0.4f;
             float growthRate = 0.2f;
             float ballSize = 0.4f;
 
             float height = Wall.CalculateWallHeight(0, playAreaHeight, initialFraction, growthRate, ballSize);
 
-            // Initial height = 0.5 * 10 = 5.0
             float expectedHeight = initialFraction * playAreaHeight;
             Assert.AreEqual(expectedHeight, height, 0.01f, "Wall at score 0 should be at initial height");
         }
@@ -43,7 +43,7 @@ namespace GolfWall.Tests
         public void WallHeight_Increases_WithScore()
         {
             float playAreaHeight = 10f;
-            float initialFraction = 0.5f;
+            float initialFraction = 0.4f;
             float growthRate = 0.2f;
             float ballSize = 0.4f;
 
@@ -59,7 +59,7 @@ namespace GolfWall.Tests
         public void WallHeight_NeverExceedsMax()
         {
             float playAreaHeight = 10f;
-            float initialFraction = 0.5f;
+            float initialFraction = 0.4f;
             float growthRate = 0.2f;
             float ballSize = 0.4f;
             float maxHeight = playAreaHeight - ballSize;
@@ -75,14 +75,13 @@ namespace GolfWall.Tests
         public void WallHeight_Asymptotes_Correctly()
         {
             float playAreaHeight = 10f;
-            float initialFraction = 0.5f;
+            float initialFraction = 0.4f;
             float growthRate = 0.2f;
             float ballSize = 0.4f;
             float maxHeight = playAreaHeight - ballSize;
 
             float hHigh = Wall.CalculateWallHeight(1000, playAreaHeight, initialFraction, growthRate, ballSize);
 
-            // At very high scores, wall should be very close to max
             Assert.AreEqual(maxHeight, hHigh, 0.05f, "Wall should asymptote near max at very high scores");
         }
 
@@ -91,12 +90,10 @@ namespace GolfWall.Tests
         {
             var settings = CreateTestSettings();
 
-            // Very low angular velocity → should clamp to min
             float lowSpeed = 1f * settings.powerMultiplier;
             float clampedLow = Mathf.Clamp(lowSpeed, settings.minLaunchSpeed, settings.maxLaunchSpeed);
             Assert.AreEqual(settings.minLaunchSpeed, clampedLow, "Low speed should clamp to minimum");
 
-            // Very high angular velocity → should clamp to max
             float highSpeed = 100f * settings.powerMultiplier;
             float clampedHigh = Mathf.Clamp(highSpeed, settings.minLaunchSpeed, settings.maxLaunchSpeed);
             Assert.AreEqual(settings.maxLaunchSpeed, clampedHigh, "High speed should clamp to maximum");
@@ -108,7 +105,6 @@ namespace GolfWall.Tests
             var settings = CreateTestSettings();
             float velocityX = 10f;
 
-            // Wall bounce reverses X velocity with damping
             float bouncedX = -velocityX * settings.wallBounceDamping;
 
             Assert.Less(Mathf.Abs(bouncedX), Mathf.Abs(velocityX), "Bounce should reduce speed");
@@ -118,21 +114,17 @@ namespace GolfWall.Tests
         [Test]
         public void AngleWrapDelta_WrapsCorrectly()
         {
-            // Small delta — no wrapping needed
             float small = GolfWallGame.AngleWrapDelta(0.5f);
             Assert.AreEqual(0.5f, small, 0.001f);
 
-            // Large positive — wraps to negative
             float large = GolfWallGame.AngleWrapDelta(Mathf.PI + 1f);
             Assert.Less(large, Mathf.PI);
             Assert.Greater(large, -Mathf.PI);
 
-            // Large negative — wraps to positive
             float negative = GolfWallGame.AngleWrapDelta(-Mathf.PI - 1f);
             Assert.Less(negative, Mathf.PI);
             Assert.Greater(negative, -Mathf.PI);
 
-            // Exactly PI — atan2(sin(PI), cos(PI)) returns PI
             float exactPi = GolfWallGame.AngleWrapDelta(Mathf.PI);
             Assert.AreEqual(Mathf.PI, Mathf.Abs(exactPi), 0.01f);
         }
@@ -140,7 +132,6 @@ namespace GolfWall.Tests
         [Test]
         public void GravityParabola_BallFallsBack()
         {
-            // Simulate a ball launched at 55° with speed 12, gravity 12
             float speed = 12f;
             float angle = 55f * Mathf.Deg2Rad;
             float vx = speed * Mathf.Cos(angle);
@@ -185,6 +176,31 @@ namespace GolfWall.Tests
             Assert.LessOrEqual(settings.minLaunchSpeed, settings.maxLaunchSpeed, "Min should not exceed max");
             Assert.Greater(settings.wallBounceDamping, 0, "Damping should be positive");
             Assert.LessOrEqual(settings.wallBounceDamping, 1, "Damping should not exceed 1");
+            Assert.Greater(settings.clubLength, 0, "Club length should be positive");
+        }
+
+        [Test]
+        public void DistancePointToSegment_Works()
+        {
+            // Point on the segment
+            float d1 = GolfWallGame.DistancePointToSegment(
+                new Vector2(0.5f, 0), new Vector2(0, 0), new Vector2(1, 0));
+            Assert.AreEqual(0f, d1, 0.001f, "Point on segment should have distance 0");
+
+            // Point perpendicular to segment
+            float d2 = GolfWallGame.DistancePointToSegment(
+                new Vector2(0.5f, 1f), new Vector2(0, 0), new Vector2(1, 0));
+            Assert.AreEqual(1f, d2, 0.001f, "Point 1 unit above segment midpoint");
+
+            // Point beyond segment end
+            float d3 = GolfWallGame.DistancePointToSegment(
+                new Vector2(2f, 0), new Vector2(0, 0), new Vector2(1, 0));
+            Assert.AreEqual(1f, d3, 0.001f, "Point 1 unit beyond segment end");
+
+            // Degenerate segment (point)
+            float d4 = GolfWallGame.DistancePointToSegment(
+                new Vector2(3f, 4f), new Vector2(0, 0), new Vector2(0, 0));
+            Assert.AreEqual(5f, d4, 0.001f, "Distance to degenerate segment");
         }
     }
 }

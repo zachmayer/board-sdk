@@ -35,14 +35,32 @@ namespace GolfWall
         [Range(1f, 20f)]
         public float angularVelocityThreshold = 4f;
 
-        [Tooltip("Launch angle in degrees from horizontal (45=diagonal, 60=steep)")]
-        [Range(30f, 75f)]
-        public float baseLaunchAngle = 55f;
+        [Header("Club Settings")]
+        [Tooltip("Length of the club extending past the ring edge")]
+        [Range(0.5f, 2f)]
+        public float clubLength = 1.0f;
+
+        [Tooltip("Width of the club rectangle")]
+        [Range(0.05f, 0.3f)]
+        public float clubWidth = 0.12f;
+
+        [Header("Tee Settings")]
+        [Tooltip("Height of the tee stick")]
+        [Range(0.2f, 1f)]
+        public float teeHeight = 0.4f;
+
+        [Tooltip("Horizontal position of tee as fraction from left edge toward wall (0=left edge, 1=wall)")]
+        [Range(0.2f, 0.8f)]
+        public float teeXFraction = 0.45f;
+
+        [Tooltip("Vertical position of tee base from bottom edge")]
+        [Range(0.5f, 3f)]
+        public float teeBottomOffset = 1.5f;
 
         [Header("Wall Settings")]
         [Tooltip("Initial wall height as fraction of screen height")]
         [Range(0.2f, 0.8f)]
-        public float initialHeightFraction = 0.5f;
+        public float initialHeightFraction = 0.4f;
 
         [Tooltip("Wall thickness in world units")]
         [Range(0.1f, 0.5f)]
@@ -61,6 +79,8 @@ namespace GolfWall
         public Color backgroundColor = new Color(0.08f, 0.12f, 0.08f);
         public Color wallColor = new Color(0.6f, 0.3f, 0.2f);
         public Color pieceIndicatorColor = new Color(0.3f, 0.8f, 0.3f, 0.3f);
+        public Color clubColor = new Color(0.2f, 0.2f, 0.2f, 1f);
+        public Color teeColor = new Color(0.6f, 0.4f, 0.2f, 1f);
         public Color ballColor = Color.white;
         public Color landingZoneColor = new Color(0.2f, 0.5f, 0.2f, 0.3f);
 

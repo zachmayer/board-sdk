@@ -22,8 +22,9 @@ namespace GolfWall.Tests
             settings.maxLaunchSpeed = 18f;
             settings.wallBounceDamping = 0.7f;
             settings.angularVelocityThreshold = 4f;
-            settings.baseLaunchAngle = 55f;
-            settings.initialHeightFraction = 0.5f;
+            settings.clubLength = 1.0f;
+            settings.clubWidth = 0.12f;
+            settings.initialHeightFraction = 0.4f;
             settings.wallThickness = 0.3f;
             settings.growthRate = 0.2f;
             settings.hitDetectionRadius = 0.8f;
@@ -68,16 +69,33 @@ namespace GolfWall.Tests
         }
 
         [UnityTest]
+        public IEnumerator Ball_PlacesOnTee_VisibleButInactive()
+        {
+            var ballObj = new GameObject("TestBall");
+            var ball = ballObj.AddComponent<GolfBall>();
+            ball.Initialize(settings);
+
+            Vector3 teePos = new Vector3(-2f, -3f, 0);
+            ball.PlaceOnTee(teePos);
+
+            yield return null;
+
+            Assert.IsTrue(ballObj.activeSelf, "Ball should be visible on tee");
+            Assert.IsFalse(ball.IsActive, "Ball should not have active physics on tee");
+            Assert.AreEqual(teePos, ball.CurrentPosition, "Ball should be at tee position");
+
+            Object.Destroy(ballObj);
+        }
+
+        [UnityTest]
         public IEnumerator Ball_Launches_Upward()
         {
             var ballObj = new GameObject("TestBall");
             var ball = ballObj.AddComponent<GolfBall>();
             ball.Initialize(settings);
 
-            // Launch with rightward and upward velocity (parabolic arc)
             ball.Launch(Vector3.zero, new Vector2(8f, 12f));
 
-            // Step physics manually
             for (int i = 0; i < 5; i++)
             {
                 ball.PhysicsStep();
@@ -97,13 +115,12 @@ namespace GolfWall.Tests
             var ball = ballObj.AddComponent<GolfBall>();
             ball.Initialize(settings);
 
-            // Launch with modest upward speed so gravity overtakes quickly
             ball.Launch(new Vector3(-3, 0, 0), new Vector2(5f, 5f));
 
             float maxY = ball.CurrentPosition.y;
             bool startedFalling = false;
 
-            for (int i = 0; i < 120; i++) // 2 seconds at 60Hz
+            for (int i = 0; i < 120; i++)
             {
                 ball.PhysicsStep();
                 yield return new WaitForFixedUpdate();
@@ -139,7 +156,6 @@ namespace GolfWall.Tests
             yield return null;
             yield return null;
 
-            // Ball is inactive so PhysicsStep won't move it
             Assert.IsFalse(ball.IsActive, "Ball should be inactive after Stop");
 
             Object.Destroy(ballObj);
@@ -157,11 +173,9 @@ namespace GolfWall.Tests
 
             yield return null;
 
-            // Wall should be at x=0 (centered), extending from bottom
             Assert.AreEqual(0f, wallObj.transform.position.x, 0.01f,
                 "Wall should be centered at x=0");
 
-            // Check wall height at score 0
             float expectedHeight = Wall.CalculateWallHeight(0, playAreaHeight,
                 settings.initialHeightFraction, settings.growthRate, settings.ballSize);
             float expectedTopY = -playAreaHeight / 2f + expectedHeight;
@@ -202,7 +216,6 @@ namespace GolfWall.Tests
             var ball = ballObj.AddComponent<GolfBall>();
             ball.Initialize(settings);
 
-            // Launch rightward (toward wall)
             ball.Launch(Vector3.zero, new Vector2(15f, 5f));
             ball.PhysicsStep();
             yield return new WaitForFixedUpdate();

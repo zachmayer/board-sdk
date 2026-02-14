@@ -340,7 +340,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &890756952
+--- !u!1 &1584251007
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -348,8 +348,8 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 890756954}
-  - component: {fileID: 890756953}
+  - component: {fileID: 1584251009}
+  - component: {fileID: 1584251008}
   m_Layer: 0
   m_Name: GolfWallGame
   m_TagString: Untagged
@@ -357,13 +357,13 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &890756953
+--- !u!114 &1584251008
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 890756952}
+  m_GameObject: {fileID: 1584251007}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8123f97f95919413d9deb55b820fd6dd, type: 3}
@@ -372,13 +372,13 @@ MonoBehaviour:
   settings: {fileID: 11400000, guid: 3f61c9664822a44178fdaa648e6139ff, type: 2}
   scoreText: {fileID: 0}
   messageText: {fileID: 0}
---- !u!4 &890756954
+--- !u!4 &1584251009
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 890756952}
+  m_GameObject: {fileID: 1584251007}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -441,4 +441,4 @@ SceneRoots:
   - {fileID: 519420032}
   - {fileID: 619394802}
   - {fileID: 1694631034}
-  - {fileID: 890756954}
+  - {fileID: 1584251009}

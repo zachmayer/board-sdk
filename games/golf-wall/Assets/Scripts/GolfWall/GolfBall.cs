@@ -49,6 +49,17 @@ namespace GolfWall
             isActive = true;
         }
 
+        /// <summary>Show ball on tee (visible but no physics).</summary>
+        public void PlaceOnTee(Vector3 position)
+        {
+            gameObject.SetActive(true);
+            isActive = false;
+            velocity = Vector2.zero;
+            currentPosition = position;
+            previousPosition = position;
+            transform.position = position;
+        }
+
         public void Stop()
         {
             isActive = false;

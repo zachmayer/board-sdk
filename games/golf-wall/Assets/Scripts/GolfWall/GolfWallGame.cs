@@ -22,11 +22,25 @@ namespace GolfWall
         private enum GameState { WaitingToStart, ReadyToSwing, BallInFlight }
         private GameState state = GameState.WaitingToStart;
 
-        // Piece tracking
+        // Piece tracking (smoothed)
         private GameObject pieceIndicator;
-        private SpriteRenderer pieceIndicatorRenderer;
         private Vector3 pieceWorldPos;
+        private Vector3 smoothedPiecePos;
+        private float smoothedOrientationDeg; // Unity Z degrees
         private bool pieceTracked;
+        private bool hasSmoothedPos;
+        private const float POS_SMOOTH_TAU = 0.07f;
+        private const float ROT_SMOOTH_TAU = 0.05f;
+
+        // Club visual (child of pieceIndicator)
+        private GameObject clubObject;
+        private Vector2 prevClubTipPos;
+        private bool hasPrevClubTip;
+
+        // Tee
+        private GameObject teeObject;
+        private Vector3 teePosition; // ball center when on tee
+        private Vector3 teeBasePosition;
 
         // Angular velocity tracking
         private float lastOrientation;
@@ -43,6 +57,10 @@ namespace GolfWall
         private AudioClip swingSound;
         private AudioClip thudSound;
         private AudioClip scoreSound;
+        private AudioClip hitSound;
+
+        // Shared white sprite for rectangles
+        private Sprite whiteSprite;
 
         private void Awake()
         {
@@ -55,6 +73,9 @@ namespace GolfWall
             playAreaHeight = mainCamera.orthographicSize * 2f;
             playAreaWidth = playAreaHeight * mainCamera.aspect;
 
+            whiteSprite = CreateWhiteSprite();
+
+            ComputeTeePosition();
             CreateGameObjects();
 
             if (scoreText == null || messageText == null)
@@ -65,14 +86,18 @@ namespace GolfWall
             Debug.Log($"[GolfWall] Camera ortho={mainCamera.orthographicSize} aspect={mainCamera.aspect:F2} " +
                 $"playArea={playAreaWidth:F1}x{playAreaHeight:F1}");
             Debug.Log($"[GolfWall] Wall: leftX={wall.WallLeftX:F2} rightX={wall.WallRightX:F2} " +
-                $"topY={wall.WallTopY:F2} scale={wall.transform.lossyScale}");
+                $"topY={wall.WallTopY:F2}");
+            Debug.Log($"[GolfWall] Tee: base={teeBasePosition} ball={teePosition}");
 
             // Configure Board pause screen
             BoardApplication.SetPauseScreenContext(applicationName: "Golf Wall");
             BoardApplication.pauseScreenActionReceived += OnPauseAction;
 
             UpdateScoreDisplay();
-            ShowMessage("Place robot piece\non the left side");
+            ShowMessage("Place robot piece\nnear the ball");
+
+            // Place ball on tee
+            ball.PlaceOnTee(teePosition);
         }
 
         private void OnPauseAction(BoardPauseAction action, BoardPauseAudioTrack[] audioTracks)
@@ -94,6 +119,21 @@ namespace GolfWall
             BoardApplication.pauseScreenActionReceived -= OnPauseAction;
         }
 
+        private void ComputeTeePosition()
+        {
+            float halfWidth = playAreaWidth / 2f;
+            float halfHeight = playAreaHeight / 2f;
+
+            // Tee X: fraction of the way from left edge toward wall (x=0)
+            float teeX = Mathf.Lerp(-halfWidth, 0, settings.teeXFraction);
+            // Tee base Y: offset from bottom edge
+            float teeBaseY = -halfHeight + settings.teeBottomOffset;
+
+            teeBasePosition = new Vector3(teeX, teeBaseY, 0);
+            // Ball center sits on top of tee
+            teePosition = new Vector3(teeX, teeBaseY + settings.teeHeight + settings.ballSize / 2f, 0);
+        }
+
         private void CreateGameObjects()
         {
             // Create ball
@@ -106,13 +146,33 @@ namespace GolfWall
             wall = wallObj.AddComponent<Wall>();
             wall.Initialize(settings, playAreaWidth, playAreaHeight);
 
-            // Create piece indicator (translucent ring)
+            // Create piece indicator (empty root — no scale, rotated by orientation)
             pieceIndicator = new GameObject("PieceIndicator");
-            pieceIndicatorRenderer = pieceIndicator.AddComponent<SpriteRenderer>();
-            pieceIndicatorRenderer.sprite = CreateRingSprite();
-            pieceIndicatorRenderer.color = settings.pieceIndicatorColor;
-            pieceIndicator.transform.localScale = Vector3.one * settings.hitDetectionRadius * 2f;
             pieceIndicator.SetActive(false);
+
+            // Ring child (visual circle around piece)
+            var ringObj = new GameObject("Ring");
+            ringObj.transform.SetParent(pieceIndicator.transform, false);
+            var ringRenderer = ringObj.AddComponent<SpriteRenderer>();
+            ringRenderer.sprite = CreateRingSprite();
+            ringRenderer.color = settings.pieceIndicatorColor;
+            ringObj.transform.localScale = Vector3.one * settings.hitDetectionRadius * 2f;
+
+            // Club child (rectangle extending from ring edge)
+            clubObject = new GameObject("Club");
+            clubObject.transform.SetParent(pieceIndicator.transform, false);
+            var clubRenderer = clubObject.AddComponent<SpriteRenderer>();
+            clubRenderer.sprite = whiteSprite;
+            clubRenderer.color = settings.clubColor;
+            clubRenderer.sortingOrder = 1;
+            // Scale: club length x club width (in world units, parent has no scale)
+            clubObject.transform.localScale = new Vector3(settings.clubLength, settings.clubWidth, 1);
+            // Offset: starts at ring edge, extends outward along local +X
+            clubObject.transform.localPosition = new Vector3(
+                settings.hitDetectionRadius + settings.clubLength * 0.5f, 0, 0);
+
+            // Create tee visual
+            CreateTee();
 
             // Create landing zone visual on right side
             CreateLandingZone();
@@ -121,18 +181,26 @@ namespace GolfWall
             CreateBackground();
         }
 
+        private void CreateTee()
+        {
+            teeObject = new GameObject("Tee");
+            var renderer = teeObject.AddComponent<SpriteRenderer>();
+            renderer.sprite = whiteSprite;
+            renderer.color = settings.teeColor;
+            renderer.sortingOrder = -1;
+
+            teeObject.transform.localScale = new Vector3(0.08f, settings.teeHeight, 1);
+            teeObject.transform.position = teeBasePosition + Vector3.up * (settings.teeHeight * 0.5f);
+        }
+
         private void CreateLandingZone()
         {
             landingZone = new GameObject("LandingZone");
             var renderer = landingZone.AddComponent<SpriteRenderer>();
-            Texture2D tex = new Texture2D(1, 1);
-            tex.SetPixel(0, 0, Color.white);
-            tex.Apply();
-            renderer.sprite = Sprite.Create(tex, new Rect(0, 0, 1, 1), new Vector2(0.5f, 0.5f), 1);
+            renderer.sprite = whiteSprite;
             renderer.color = settings.landingZoneColor;
-            renderer.sortingOrder = -1;
+            renderer.sortingOrder = -2;
 
-            // Right half of screen (past the wall)
             float rightWidth = playAreaWidth / 2f - settings.wallThickness / 2f;
             float centerX = settings.wallThickness / 2f + rightWidth / 2f;
             landingZone.transform.localScale = new Vector3(rightWidth, playAreaHeight, 1);
@@ -155,7 +223,7 @@ namespace GolfWall
                     if (pieceTracked)
                     {
                         state = GameState.ReadyToSwing;
-                        ShowMessage("Spin the piece\nto swing!");
+                        ShowMessage("Spin to swing!");
                     }
                     break;
 
@@ -163,14 +231,13 @@ namespace GolfWall
                     if (!pieceTracked)
                     {
                         state = GameState.WaitingToStart;
-                        ShowMessage("Place robot piece\non the left side");
+                        ShowMessage("Place robot piece\nnear the ball");
                         break;
                     }
-                    CheckForSwing();
+                    CheckForClubHit();
                     break;
 
                 case GameState.BallInFlight:
-                    // Physics runs in FixedUpdate
                     break;
             }
         }
@@ -192,39 +259,80 @@ namespace GolfWall
                 pieceTracked = false;
                 pieceIndicator.SetActive(false);
                 ResetAngularTracking();
+                hasSmoothedPos = false;
+                hasPrevClubTip = false;
                 return;
             }
 
             // Track first glyph
             BoardContact contact = contacts[0];
-            pieceWorldPos = mainCamera.ScreenToWorldPoint(
+            Vector3 rawPos = mainCamera.ScreenToWorldPoint(
                 new Vector3(contact.screenPosition.x, contact.screenPosition.y, 10));
-            pieceWorldPos.z = 0;
+            rawPos.z = 0;
+            pieceWorldPos = rawPos;
+
+            // Position smoothing (exponential moving average, frame-rate independent)
+            if (hasSmoothedPos)
+            {
+                float alpha = 1f - Mathf.Exp(-Time.deltaTime / POS_SMOOTH_TAU);
+                smoothedPiecePos = Vector3.Lerp(smoothedPiecePos, rawPos, alpha);
+            }
+            else
+            {
+                smoothedPiecePos = rawPos;
+                hasSmoothedPos = true;
+            }
+
+            // Orientation: SDK gives radians CW from vertical → Unity Z degrees CCW from +X
+            float sdkOrientationRad = contact.orientation;
+            float rawUnityZDeg = 90f - sdkOrientationRad * Mathf.Rad2Deg;
+
+            // Orientation smoothing
+            if (pieceTracked)
+            {
+                float alpha = 1f - Mathf.Exp(-Time.deltaTime / ROT_SMOOTH_TAU);
+                smoothedOrientationDeg = Mathf.LerpAngle(smoothedOrientationDeg, rawUnityZDeg, alpha);
+            }
+            else
+            {
+                smoothedOrientationDeg = rawUnityZDeg;
+            }
 
             pieceTracked = true;
             pieceIndicator.SetActive(true);
-            pieceIndicator.transform.position = pieceWorldPos;
+            pieceIndicator.transform.position = smoothedPiecePos;
+            pieceIndicator.transform.rotation = Quaternion.Euler(0, 0, smoothedOrientationDeg);
 
-            // Compute instantaneous angular velocity from SDK orientation (already in radians)
-            float orientation = contact.orientation;
+            // Track club tip for swept hit detection
+            Vector2 clubDir = (Vector2)pieceIndicator.transform.right;
+            float tipRadius = settings.hitDetectionRadius + settings.clubLength;
+            Vector2 currTipPos = (Vector2)smoothedPiecePos + clubDir * tipRadius;
+
+            if (!hasPrevClubTip)
+            {
+                prevClubTipPos = currTipPos;
+                hasPrevClubTip = true;
+            }
+            // prevClubTipPos is updated after hit check in CheckForClubHit()
+
+            // Angular velocity from SDK orientation (already in radians)
             double timestamp = contact.timestamp;
 
             if (hasLastOrientation && timestamp > lastTimestamp)
             {
                 float dt = (float)(timestamp - lastTimestamp);
-                float dAngle = AngleWrapDelta(orientation - lastOrientation);
+                float dAngle = AngleWrapDelta(sdkOrientationRad - lastOrientation);
                 float angVel = dAngle / dt;
 
-                // Track peak angular velocity (decays over time)
                 if (Mathf.Abs(angVel) > Mathf.Abs(peakAngularVelocity))
                     peakAngularVelocity = angVel;
             }
 
-            lastOrientation = orientation;
+            lastOrientation = sdkOrientationRad;
             lastTimestamp = timestamp;
             hasLastOrientation = true;
 
-            // Decay peak over time so stale spins don't trigger
+            // Decay peak over time
             peakDecayTimer += Time.deltaTime;
             if (peakDecayTimer > 0.15f)
             {
@@ -248,50 +356,96 @@ namespace GolfWall
             peakDecayTimer = 0f;
         }
 
-        private void CheckForSwing()
+        /// <summary>
+        /// Check if the club tip swept through the ball position this frame.
+        /// Uses point-to-segment distance for swept collision detection.
+        /// </summary>
+        private void CheckForClubHit()
         {
             float absAngVel = Mathf.Abs(peakAngularVelocity);
-            if (absAngVel >= settings.angularVelocityThreshold)
+
+            // Only check for hit if spinning fast enough
+            if (absAngVel < settings.angularVelocityThreshold)
             {
-                Debug.Log($"[GolfWall] Swing detected! angVel={peakAngularVelocity:F2} rad/s " +
-                    $"(threshold={settings.angularVelocityThreshold})");
-                LaunchBall(absAngVel);
+                // Update previous tip position even when not hitting
+                Vector2 clubDir = (Vector2)pieceIndicator.transform.right;
+                float tipRadius = settings.hitDetectionRadius + settings.clubLength;
+                prevClubTipPos = (Vector2)smoothedPiecePos + clubDir * tipRadius;
+                return;
             }
+
+            Vector2 currClubDir = (Vector2)pieceIndicator.transform.right;
+            float currTipRadius = settings.hitDetectionRadius + settings.clubLength;
+            Vector2 currTipPos = (Vector2)smoothedPiecePos + currClubDir * currTipRadius;
+
+            Vector2 ballPos = (Vector2)teePosition;
+            float ballRadius = settings.ballSize / 2f;
+            float clubTipRadius = settings.clubWidth * 0.5f;
+            float hitDist = ballRadius + clubTipRadius + 0.05f; // small forgiveness
+
+            // Swept collision: distance from ball to the line segment (prevTip → currTip)
+            float dist = DistancePointToSegment(ballPos, prevClubTipPos, currTipPos);
+
+            if (dist <= hitDist)
+            {
+                Debug.Log($"[GolfWall] Club hit ball! angVel={peakAngularVelocity:F2} dist={dist:F3} " +
+                    $"clubAngle={smoothedOrientationDeg:F0}°");
+                LaunchBallFromClub(absAngVel, currClubDir);
+            }
+
+            prevClubTipPos = currTipPos;
         }
 
-        private void LaunchBall(float angularSpeed)
+        /// <summary>
+        /// Distance from point p to the line segment a→b.
+        /// </summary>
+        public static float DistancePointToSegment(Vector2 p, Vector2 a, Vector2 b)
         {
-            float speed = Mathf.Clamp(angularSpeed * settings.powerMultiplier,
+            Vector2 ab = b - a;
+            float abLen2 = Vector2.Dot(ab, ab);
+            if (abLen2 < 1e-8f) return Vector2.Distance(p, a);
+
+            float t = Vector2.Dot(p - a, ab) / abLen2;
+            t = Mathf.Clamp01(t);
+            Vector2 closest = a + t * ab;
+            return Vector2.Distance(p, closest);
+        }
+
+        private void LaunchBallFromClub(float angularSpeed, Vector2 clubDir)
+        {
+            // Speed: tangential velocity of club tip = angular velocity * tip radius
+            float tipRadius = settings.hitDetectionRadius + settings.clubLength;
+            float tipSpeed = angularSpeed * tipRadius;
+            float speed = Mathf.Clamp(tipSpeed * settings.powerMultiplier,
                 settings.minLaunchSpeed, settings.maxLaunchSpeed);
 
-            float halfWidth = playAreaWidth / 2f;
+            // Direction: perpendicular to club, pick the one that goes more upper-right
+            Vector2 perpCCW = new Vector2(-clubDir.y, clubDir.x);
+            Vector2 perpCW = new Vector2(clubDir.y, -clubDir.x);
+            Vector2 desired = new Vector2(1f, 1f).normalized;
+            Vector2 launchDir = Vector2.Dot(perpCCW, desired) >= Vector2.Dot(perpCW, desired)
+                ? perpCCW : perpCW;
 
-            // Map piece X position to launch angle:
-            // Closer to wall (x near 0) → steeper angle (70°) to pop over
-            // Far from wall (x near -halfWidth) → shallower angle (40°) for longer arc
-            float t = Mathf.InverseLerp(-halfWidth, wall.WallLeftX, pieceWorldPos.x);
-            t = Mathf.Clamp01(t);
-            float angleDeg = Mathf.Lerp(40f, 70f, t);
-            float angleRad = angleDeg * Mathf.Deg2Rad;
+            // Clamp launch angle to [30°, 80°] from horizontal to ensure ball arcs over wall
+            float launchAngle = Mathf.Atan2(launchDir.y, launchDir.x);
+            float minAngle = 30f * Mathf.Deg2Rad;
+            float maxAngle = 80f * Mathf.Deg2Rad;
+            launchAngle = Mathf.Clamp(launchAngle, minAngle, maxAngle);
+            launchDir = new Vector2(Mathf.Cos(launchAngle), Mathf.Sin(launchAngle));
 
-            // Velocity: rightward (+X) and upward (+Y) for parabolic arc
-            Vector2 launchVelocity = new Vector2(
-                speed * Mathf.Cos(angleRad),
-                speed * Mathf.Sin(angleRad));
+            Vector2 launchVelocity = launchDir * speed;
 
-            // Launch from just above the piece position
-            Vector3 launchPos = pieceWorldPos + Vector3.up * (settings.ballSize * 0.5f);
-
-            Debug.Log($"[GolfWall] Launch: speed={speed:F1} angle={angleDeg:F0}° " +
-                $"vel=({launchVelocity.x:F1},{launchVelocity.y:F1}) from={launchPos} " +
+            Debug.Log($"[GolfWall] Launch: speed={speed:F1} angle={launchAngle * Mathf.Rad2Deg:F0}° " +
+                $"vel=({launchVelocity.x:F1},{launchVelocity.y:F1}) from={teePosition} " +
                 $"wallTopY={wall.WallTopY:F2}");
 
-            ball.Launch(launchPos, launchVelocity);
+            ball.Launch(teePosition, launchVelocity);
             state = GameState.BallInFlight;
             ShowMessage("");
 
-            PlaySound(swingSound);
+            PlaySound(hitSound);
             ResetAngularTracking();
+            hasPrevClubTip = false;
         }
 
         private void CheckCollisions()
@@ -302,8 +456,6 @@ namespace GolfWall
             float halfHeight = playAreaHeight / 2f;
 
             // --- Vertical wall collision (check first) ---
-            // Wall spans from screen bottom to WallTopY at x=0
-            // Ball hits wall face if moving rightward into the wall while below wall top
             if (ball.Velocity.x > 0 &&
                 ballPos.x + halfBall >= wall.WallLeftX &&
                 ballPos.x - halfBall < wall.WallRightX &&
@@ -329,7 +481,6 @@ namespace GolfWall
             }
 
             // --- Scoring: ball cleared the wall ---
-            // Ball's left edge is past wall's right edge = it went over
             if (ballPos.x - halfBall > wall.WallRightX)
             {
                 Score();
@@ -337,28 +488,24 @@ namespace GolfWall
             }
 
             // --- Screen bounds ---
-            // Left edge bounce
             if (ballPos.x - halfBall <= -halfWidth)
             {
                 ball.BounceOffWall();
                 ball.SnapPosition(new Vector3(-halfWidth + halfBall + 0.01f, ballPos.y, 0));
             }
 
-            // Right edge (ball went far right — already scored above, but safety)
             if (ballPos.x + halfBall >= halfWidth)
             {
                 Score();
                 return;
             }
 
-            // Top edge bounce
             if (ballPos.y + halfBall >= halfHeight)
             {
                 ball.BounceOffTopBottom();
                 ball.SnapPosition(new Vector3(ballPos.x, halfHeight - halfBall - 0.01f, 0));
             }
 
-            // Bottom edge — ball fell off screen
             if (ballPos.y - halfBall <= -halfHeight)
             {
                 BallMissed();
@@ -376,6 +523,9 @@ namespace GolfWall
             ShowMessage($"Nice shot!\nScore: {score}");
             PlaySound(scoreSound);
 
+            // Reset ball to tee
+            ball.PlaceOnTee(teePosition);
+
             Debug.Log($"[GolfWall] Score! Now {score}. Wall height growing.");
         }
 
@@ -384,6 +534,9 @@ namespace GolfWall
             ball.Stop();
             state = GameState.ReadyToSwing;
             ShowMessage("Missed! Try again!");
+
+            // Reset ball to tee
+            ball.PlaceOnTee(teePosition);
 
             Debug.Log("[GolfWall] Ball missed (fell off screen).");
         }
@@ -407,7 +560,6 @@ namespace GolfWall
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvasObj.AddComponent<CanvasScaler>();
 
-            // Score text at top center
             GameObject scoreObj = new GameObject("ScoreText");
             scoreObj.transform.SetParent(canvasObj.transform, false);
             scoreText = scoreObj.AddComponent<Text>();
@@ -421,7 +573,6 @@ namespace GolfWall
             scoreRect.offsetMin = Vector2.zero;
             scoreRect.offsetMax = Vector2.zero;
 
-            // Message text at center
             GameObject msgObj = new GameObject("MessageText");
             msgObj.transform.SetParent(canvasObj.transform, false);
             messageText = msgObj.AddComponent<Text>();
@@ -440,14 +591,10 @@ namespace GolfWall
         {
             audioSource = gameObject.AddComponent<AudioSource>();
 
-            // Swing whoosh: frequency sweep 200→800Hz over 0.15s
             swingSound = CreateFrequencySweep(200f, 800f, 0.15f);
-
-            // Wall thud: 110Hz, short
             thudSound = CreateBeep(110f, 0.1f);
-
-            // Score ding: 880Hz
             scoreSound = CreateBeep(880f, 0.2f);
+            hitSound = CreateBeep(660f, 0.08f); // short crack for club contact
         }
 
         private AudioClip CreateBeep(float frequency, float duration)
@@ -493,6 +640,14 @@ namespace GolfWall
         {
             if (settings.enableSound && audioSource != null)
                 audioSource.PlayOneShot(clip);
+        }
+
+        private Sprite CreateWhiteSprite()
+        {
+            Texture2D tex = new Texture2D(1, 1);
+            tex.SetPixel(0, 0, Color.white);
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, 1, 1), new Vector2(0.5f, 0.5f), 1);
         }
 
         private Sprite CreateRingSprite()
