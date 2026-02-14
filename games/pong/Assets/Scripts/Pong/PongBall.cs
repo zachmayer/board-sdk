@@ -4,6 +4,7 @@ namespace Pong
 {
     /// <summary>
     /// Controls the ball movement and collision in Pong.
+    /// Uses FixedUpdate for physics with interpolation for smooth rendering.
     /// </summary>
     public class PongBall : MonoBehaviour
     {
@@ -14,7 +15,12 @@ namespace Pong
 
         private SpriteRenderer spriteRenderer;
 
+        // Interpolation state
+        private Vector3 previousPosition;
+        private Vector3 currentPosition;
+
         public Vector2 Velocity => velocity;
+        public Vector3 CurrentPosition => currentPosition;
 
         public void Initialize(PongSettings gameSettings)
         {
@@ -32,12 +38,17 @@ namespace Pong
             spriteRenderer.sprite = CreateCircleSprite();
             spriteRenderer.color = Color.white;
             transform.localScale = Vector3.one * settings.ballSize;
+
+            previousPosition = transform.position;
+            currentPosition = transform.position;
         }
 
         public void Serve(int direction)
         {
             // Reset position to center
             transform.position = Vector3.zero;
+            previousPosition = Vector3.zero;
+            currentPosition = Vector3.zero;
 
             // Reset speed
             currentSpeed = settings.ballSpeed;
@@ -58,13 +69,38 @@ namespace Pong
             velocity = Vector2.zero;
         }
 
+        /// <summary>
+        /// Called by PongGame in FixedUpdate for deterministic physics.
+        /// </summary>
+        public void PhysicsStep()
+        {
+            if (!isActive) return;
+
+            previousPosition = currentPosition;
+            currentPosition += (Vector3)(velocity * Time.fixedDeltaTime);
+        }
+
+        /// <summary>
+        /// Interpolate between physics steps for smooth rendering.
+        /// </summary>
         private void Update()
         {
             if (!isActive) return;
 
-            // Move ball
-            Vector3 newPos = transform.position + (Vector3)(velocity * Time.deltaTime);
-            transform.position = newPos;
+            // Interpolation factor: how far between the last two fixed steps
+            float t = (Time.time - Time.fixedTime) / Time.fixedDeltaTime;
+            t = Mathf.Clamp01(t);
+            transform.position = Vector3.Lerp(previousPosition, currentPosition, t);
+        }
+
+        /// <summary>
+        /// Snap position (used after collision resolution to avoid interpolation artifacts).
+        /// </summary>
+        public void SnapPosition(Vector3 pos)
+        {
+            currentPosition = pos;
+            previousPosition = pos;
+            transform.position = pos;
         }
 
         public void BounceOffWall()

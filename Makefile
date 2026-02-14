@@ -11,7 +11,7 @@ PONG_APK := $(PONG)/Build/Pong.apk
 PONG_PACKAGE := com.DefaultCompany.Myproject
 RESULTS_DIR := /tmp/pong-tests
 
-.PHONY: help test test-edit test-play build build-mac build-android deploy logs stop bdb-status clean
+.PHONY: help test test-edit test-play build build-mac build-android setup-scene deploy logs stop bdb-status bdb-fix clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}'
@@ -48,7 +48,13 @@ build-mac: ## Build macOS app for testing (close Unity first)
 		-logFile -
 	@echo "Built: $(PONG)/Build/Pong.app"
 
-build-android: ## Build Android APK for Board hardware (close Unity first)
+setup-scene: ## Setup Pong scene (creates game objects, saves scene)
+	$(UNITY) -batchmode -nographics -quit -projectPath "$(PONG)" \
+		-executeMethod Pong.Editor.BatchSetup.SetupAndSave \
+		-logFile -
+	@echo "Scene setup complete"
+
+build-android: setup-scene ## Build Android APK for Board hardware (close Unity first)
 	@mkdir -p "$(PONG)/Build"
 	$(UNITY) -batchmode -nographics -quit -projectPath "$(PONG)" \
 		-buildTarget Android \

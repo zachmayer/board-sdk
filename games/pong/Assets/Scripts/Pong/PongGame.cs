@@ -37,6 +37,12 @@ namespace Pong
 
         private void Awake()
         {
+            // Target high frame rate for smooth rendering
+            Application.targetFrameRate = 120;
+            QualitySettings.vSyncCount = 0;
+            // Match fixed timestep to 60Hz for stable physics
+            Time.fixedDeltaTime = 1f / 60f;
+
             mainCamera = Camera.main;
 
             // Calculate play area from camera
@@ -45,6 +51,10 @@ namespace Pong
 
             // Create game objects
             CreateGameObjects();
+
+            // Create UI if not wired up in scene
+            if (scoreText == null || messageText == null)
+                CreateUI();
 
             // Initialize audio
             CreateAudio();
@@ -162,32 +172,34 @@ namespace Pong
 
         private void Update()
         {
-            // Handle Board SDK touch input
+            // Handle Board SDK touch input every frame for responsiveness
             ProcessTouchInput();
 
-            // Update game state
+            // Handle state transitions in Update for immediate response
             switch (state)
             {
                 case GameState.WaitingToStart:
                     if (leftPaddle.IsControlled || rightPaddle.IsControlled)
-                    {
                         StartGame();
-                    }
-                    break;
-
-                case GameState.Playing:
-                    UpdateBallCollisions();
-                    CheckForScore();
                     break;
 
                 case GameState.GameOver:
-                    // Wait for touch to restart
                     if (leftPaddle.IsControlled || rightPaddle.IsControlled)
-                    {
                         ResetGame();
-                    }
                     break;
             }
+        }
+
+        private void FixedUpdate()
+        {
+            if (state != GameState.Playing) return;
+
+            // Step ball physics at fixed rate
+            ball.PhysicsStep();
+
+            // Check collisions against the physics position
+            UpdateBallCollisions();
+            CheckForScore();
         }
 
         private void ProcessTouchInput()
@@ -246,7 +258,7 @@ namespace Pong
 
         private void UpdateBallCollisions()
         {
-            Vector3 ballPos = ball.transform.position;
+            Vector3 ballPos = ball.CurrentPosition;
             float halfBallSize = settings.ballSize / 2f;
             float halfHeight = playAreaHeight / 2f;
 
@@ -254,9 +266,8 @@ namespace Pong
             if (ballPos.y + halfBallSize >= halfHeight || ballPos.y - halfBallSize <= -halfHeight)
             {
                 ball.BounceOffWall();
-                // Clamp position
                 float clampedY = Mathf.Clamp(ballPos.y, -halfHeight + halfBallSize, halfHeight - halfBallSize);
-                ball.transform.position = new Vector3(ballPos.x, clampedY, ballPos.z);
+                ball.SnapPosition(new Vector3(ballPos.x, clampedY, ballPos.z));
             }
 
             // Paddle collisions (direction is where ball goes AFTER bounce)
@@ -297,31 +308,27 @@ namespace Pong
                 float newX = isLeftPaddle
                     ? paddleX + halfPaddleThickness + halfBallSize + 0.05f
                     : paddleX - halfPaddleThickness - halfBallSize - 0.05f;
-                ball.transform.position = new Vector3(newX, ballPos.y, ballPos.z);
+                ball.SnapPosition(new Vector3(newX, ballPos.y, ballPos.z));
             }
         }
 
         private void CheckForScore()
         {
-            Vector3 ballPos = ball.transform.position;
+            Vector3 ballPos = ball.CurrentPosition;
             float halfWidth = playAreaWidth / 2f;
             float halfBallSize = settings.ballSize / 2f;
 
             if (ballPos.x - halfBallSize <= -halfWidth)
             {
-                // Ball hit left wall - right player scores, ball bounces back
                 ScorePoint(1);
                 ball.BounceOffSideWall();
-                // Push ball away from wall
-                ball.transform.position = new Vector3(-halfWidth + halfBallSize + 0.05f, ballPos.y, ballPos.z);
+                ball.SnapPosition(new Vector3(-halfWidth + halfBallSize + 0.05f, ballPos.y, ballPos.z));
             }
             else if (ballPos.x + halfBallSize >= halfWidth)
             {
-                // Ball hit right wall - left player scores, ball bounces back
                 ScorePoint(0);
                 ball.BounceOffSideWall();
-                // Push ball away from wall
-                ball.transform.position = new Vector3(halfWidth - halfBallSize - 0.05f, ballPos.y, ballPos.z);
+                ball.SnapPosition(new Vector3(halfWidth - halfBallSize - 0.05f, ballPos.y, ballPos.z));
             }
         }
 
@@ -378,37 +385,41 @@ namespace Pong
             }
         }
 
-        // For editor testing without Board SDK
-#if UNITY_EDITOR
-        private void OnGUI()
+        private void CreateUI()
         {
-            if (!Application.isPlaying) return;
+            // Create Canvas
+            GameObject canvasObj = new GameObject("Canvas");
+            Canvas canvas = canvasObj.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvasObj.AddComponent<UnityEngine.UI.CanvasScaler>();
 
-            // Draw scores if no UI is set up
-            if (scoreText == null)
-            {
-                GUIStyle style = new GUIStyle(GUI.skin.label);
-                style.fontSize = 48;
-                style.alignment = TextAnchor.MiddleCenter;
-                style.normal.textColor = Color.white;
+            // Score text at top center
+            GameObject scoreObj = new GameObject("ScoreText");
+            scoreObj.transform.SetParent(canvasObj.transform, false);
+            scoreText = scoreObj.AddComponent<Text>();
+            scoreText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            scoreText.fontSize = 48;
+            scoreText.alignment = TextAnchor.MiddleCenter;
+            scoreText.color = Color.white;
+            RectTransform scoreRect = scoreText.rectTransform;
+            scoreRect.anchorMin = new Vector2(0.3f, 0.9f);
+            scoreRect.anchorMax = new Vector2(0.7f, 1f);
+            scoreRect.offsetMin = Vector2.zero;
+            scoreRect.offsetMax = Vector2.zero;
 
-                GUI.Label(new Rect(Screen.width / 2 - 100, 20, 200, 60),
-                    $"{scores[0]}  -  {scores[1]}", style);
-            }
-
-            if (messageText == null && state != GameState.Playing)
-            {
-                GUIStyle style = new GUIStyle(GUI.skin.label);
-                style.fontSize = 32;
-                style.alignment = TextAnchor.MiddleCenter;
-                style.normal.textColor = Color.white;
-
-                string msg = state == GameState.WaitingToStart ? "Touch to Start" :
-                             state == GameState.GameOver ? $"{(scores[0] > scores[1] ? "Blue" : "Orange")} Wins!\nTouch to Play Again" : "";
-
-                GUI.Label(new Rect(Screen.width / 2 - 150, Screen.height / 2 - 40, 300, 80), msg, style);
-            }
+            // Message text at center
+            GameObject msgObj = new GameObject("MessageText");
+            msgObj.transform.SetParent(canvasObj.transform, false);
+            messageText = msgObj.AddComponent<Text>();
+            messageText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            messageText.fontSize = 32;
+            messageText.alignment = TextAnchor.MiddleCenter;
+            messageText.color = Color.white;
+            RectTransform msgRect = messageText.rectTransform;
+            msgRect.anchorMin = new Vector2(0.2f, 0.4f);
+            msgRect.anchorMax = new Vector2(0.8f, 0.6f);
+            msgRect.offsetMin = Vector2.zero;
+            msgRect.offsetMax = Vector2.zero;
         }
-#endif
     }
 }
