@@ -52,7 +52,6 @@ across reboots. If the Board's DHCP address changes, rediscover with `make conne
 - [ ] Power the Board on, then run `make connect-install`, `make connect-ls`, `make connect-pair HOST=<addr>` and verify `make gw-deploy-wifi` end to end (CLI not yet installed/paired — needs a human to approve on-screen)
 - [ ] Upgrade Board SDK 3.2.1 → 3.3.0 (download `fun.board-3.3.0.tgz` from [dev.board.fun](https://dev.board.fun) — requires portal login; 3.3.0 auto-enforces Landscape Left orientation and adds simulator overlays)
 - [ ] Delete the stray `package/` directory at repo root (partial extraction of the SDK tgz — regenerable, safe to remove)
-- [ ] Decide whether to commit `uv.lock`
 
 ## USB Fallback (legacy)
 
