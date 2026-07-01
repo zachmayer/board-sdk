@@ -2,7 +2,8 @@
     "name": "Pong",
     "rootNamespace": "Pong",
     "references": [
-        "Board"
+        "Board",
+        "Unity.InputSystem"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

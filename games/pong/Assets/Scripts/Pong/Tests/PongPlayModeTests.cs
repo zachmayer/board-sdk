@@ -95,8 +95,10 @@ namespace Pong.Tests
             // Set target position
             paddle.SetTargetPosition(2f);
 
-            // Wait a few frames
-            for (int i = 0; i < 10; i++)
+            // Wait by simulated time, not frame count — batchmode frames are sub-millisecond
+            // and the paddle lerps with Time.deltaTime
+            int safetyFrames = 0;
+            for (float elapsed = 0f; elapsed < 0.5f && safetyFrames < 5000; elapsed += Time.deltaTime, safetyFrames++)
             {
                 yield return null;
             }
@@ -120,15 +122,14 @@ namespace Pong.Tests
             // Serve the ball
             ball.Serve(1);
 
-            // Wait several frames
+            // Drive physics like PongGame.FixedUpdate does — a bare ball has no driver
             for (int i = 0; i < 30; i++)
             {
+                ball.PhysicsStep();
                 yield return null;
             }
 
-            Vector3 endPos = ballObj.transform.position;
-
-            Assert.AreNotEqual(startPos, endPos, "Ball should have moved after serving");
+            Assert.AreNotEqual(startPos, ball.CurrentPosition, "Ball should have moved after serving");
 
             Object.Destroy(ballObj);
         }

@@ -9,49 +9,65 @@ A monorepo for developing games for the [Board](https://board.fun) tabletop gami
 ```
 board-sdk/
 ├── bin/                    # Shared tools
-│   └── bdb                 # Board Developer Bridge CLI
+│   └── bdb                 # Board Developer Bridge CLI (legacy, USB-only)
 ├── docs/                   # Board platform development docs
-│   └── BOARD_DEVELOPMENT_GUIDE.md  # Comprehensive dev guide
+│   └── BOARD_DEVELOPMENT_GUIDE.md  # Feb 2026 session guide (deploy sections predate board-connect)
 ├── games/                  # Game projects (each is a Unity project)
-│   └── pong/               # Pong game (Unity 6, C#)
-│       ├── Assets/Scripts/Pong/  # Game source code
-│       ├── Makefile         # Build/test/deploy automation
-│       └── README.md        # Game-specific docs
-├── fun.board-3.2.1.tgz     # Board SDK package (imported by Unity)
-└── pyproject.toml           # Python config (for tooling/scripts)
+│   ├── pong/               # Pong (Unity 6, C#) — fun.board.pong
+│   └── golf-wall/          # Golf Wall (Unity 6, C#) — fun.board.golfwall
+├── fun.board-3.2.1.tgz     # Board SDK package (imported by Unity via relative path)
+└── pyproject.toml          # Python config (for tooling/scripts)
 ```
 
 ## Key Tools
 
-- **bdb** (`bin/bdb`): Board Developer Bridge - deploys and manages apps on Board hardware
-  - `bdb status` - check Board connection
-  - `bdb install <apk>` - install APK to Board
-  - `bdb launch <package>` - launch app
-  - `bdb logs <package>` - stream logs
-  - `bdb list` - list installed apps
+- **board-connect** (`~/.local/bin/board-connect`): Board's official deploy CLI — works over WiFi (HTTP API, port 8843), built for scripting and coding agents
+  - `board-connect ls` - discover Boards on the network
+  - `board-connect pair <host>` - one-time pairing (tap Approve on the Board)
+  - `board-connect install <apk> --launch` - install and launch over WiFi
+  - `board-connect logs <package> --follow` - stream logs
+  - `board-connect screenshot --out shot.png` - capture the Board's screen (great for agentic visual verification)
+  - `--json` flag for machine-readable output
+  - Install/update: `make connect-install` (official installer, SHA256-verified)
+
+- **bdb** (`bin/bdb`): legacy Board Developer Bridge — USB serial only, superseded by board-connect but kept as fallback
+  - `bdb status` / `bdb install <apk>` / `bdb launch <pkg>` / `bdb logs <pkg>` / `bdb list`
   - If bdb won't run on macOS: `xattr -cr bin/bdb && codesign --force --deep --sign - bin/bdb`
 
 - **Unity 6** (6000.3.8f1): Game engine. Games are C# Unity projects.
-- **Board SDK** (3.2.1): Unity package providing `Board.Input` namespace for touch/glyph input.
+- **Board SDK** (3.2.1): Unity package providing `Board.Input` namespace for touch/glyph input. v3.3.0 is available on the dev portal (login required) — see README To Do.
 
-## Working With Games
+## The Headless Dev Loop
 
-There's a root-level Makefile that handles build/test/deploy for all games.
+Everything runs from the CLI — never open the Unity GUI:
 
 ```bash
 make help              # show available commands
 make test              # run unit tests (close Unity first)
-make setup-scene       # setup scene objects (run before first build)
+make sim               # build + launch Pong on this Mac; mouse = touch
+make gw-sim            # same for Golf Wall (click-drag from ball to swing)
 make build-android     # build APK for Board (auto-runs setup-scene)
-make deploy            # install and launch on Board
-make logs              # stream device logs
-make bdb-status        # check Board connection
-make bdb-fix           # fix bdb macOS permissions on a new machine
+make deploy-wifi       # install + launch on Board over WiFi (board-connect)
+make logs-wifi         # stream device logs over WiFi
+make screenshot        # PNG of the Board's screen → ~/claude/scratch/board-shot.png
+make deploy            # USB fallback via legacy bdb
 ```
 
-## Unity CLI Reference
+`gw-` prefix = Golf Wall targets; unprefixed = Pong.
 
-Almost everything can be done via CLI — avoid the Unity GUI when possible.
+### Local Mac testing (`make sim` / `make gw-sim`)
+
+The Board SDK's input simulator only exists inside the Unity Editor GUI, and
+`BoardInput.GetActiveContacts()` compiles to return an empty array on desktop
+platforms. So each game implements a small **runtime mouse fallback** (Board's own
+Godot docs recommend exactly this pattern):
+
+- Gated at runtime on `Application.isEditor || OSXPlayer/WindowsPlayer/LinuxPlayer` — never `#if UNITY_EDITOR`
+- Uses the Input System package (`Mouse.current`) — legacy `UnityEngine.Input` throws because `activeInputHandler = 1`
+- Inert on Board hardware (no mouse device exists there)
+- Limitation: mouse can't exercise real glyph orientation/multi-touch — final validation happens on hardware via `deploy-wifi` + `screenshot` + `logs-wifi`
+
+## Unity CLI Reference
 
 ```bash
 # Run any static editor method in batch mode
@@ -63,21 +79,22 @@ UNITY -batchmode -nographics -quit -projectPath <path> -executeMethod Namespace.
 -quit                   # exit when done
 -projectPath <path>     # Unity project root
 -executeMethod <method> # call a static C# method
--buildTarget Android    # set build platform
+-buildTarget Android    # set build platform (or StandaloneOSX)
 -runTests               # run test framework
 -testPlatform EditMode  # or PlayMode
 -logFile -              # log to stdout (use - for stdout)
 ```
 
 **Critical gotchas:**
-- **NEVER use `#if UNITY_EDITOR` fallbacks** — code that only runs in editor will silently fail on device. Always create real UI/objects that work everywhere. This burned us: score display worked in editor but was invisible on Board.
+- **NEVER use `#if UNITY_EDITOR` fallbacks** — code that only runs in editor will silently fail on device. Use runtime platform checks so every code path ships. This burned us: score display worked in editor but was invisible on Board.
+- **Games use Input System only** (`activeInputHandler: 1`) — legacy `UnityEngine.Input` calls throw at runtime. Use `Mouse.current` etc. from `UnityEngine.InputSystem`. Asmdef-based games (Pong) must reference `Unity.InputSystem`.
 - Close Unity GUI before running CLI commands (Unity locks project files)
 - Scene changes in batch mode are NOT auto-saved — must call `EditorSceneManager.SaveOpenScenes()`
 - Scenes need explicit setup (game objects aren't auto-added) — run `make setup-scene` before first build
-- Board SDK package path in `manifest.json` is absolute — must update when switching machines
+- Board SDK package path in `manifest.json` is **relative** (`file:../../../fun.board-3.2.1.tgz`) — works from clones and git worktrees without edits
 - Android SDK licenses must be accepted: `yes | sdkmanager --licenses`
-- USB cable must be data-capable (not charge-only). If Board loses power, restart it and reconnect.
-- Always test on device, not just simulator — things that look fine in editor can fail on hardware
+- If a batch build fails with "No valid Unity Editor license found" (entitlement 404s), the Hub's access token expired: run `open -ga "Unity Hub"`, wait ~30s for the licensing daemon, and retry
+- Always test on device, not just the Mac sim — touch latency, glyph tracking, and GPU perf only show up on hardware
 
 ## Pause Screen Integration (Required for Board)
 
@@ -86,75 +103,68 @@ Games MUST implement the Board pause menu to allow users to exit:
 - Handle `pauseScreenActionReceived` events (Resume, ExitGameSaved, ExitGameUnsaved)
 - Call `BoardApplication.Exit()` when user exits — this is fire-and-forget
 - Without this, users cannot return to the Board library (must restart Board)
+- All `BoardApplication` APIs are compiled no-ops off-device, so they're safe in the Mac sim build
 
 ## Board Hardware Deploy Workflow
 
-### USB Deploy (default)
-1. Connect Board via USB-C accessory port
-2. `make bdb-status` to verify connection
-3. `make deploy`
+### WiFi Deploy (default — board-connect)
 
-### WiFi Deploy (no cable needed)
+One-time setup per machine/Board:
+1. Board powered on, same LAN as this machine
+2. `make connect-install` (installs the CLI to `~/.local/bin`)
+3. `make connect-ls` to find the Board's address
+4. `make connect-pair HOST=<address>` → tap **Approve** on the Board's screen
 
-Once set up, you can build and deploy without a USB cable:
+Then forever after:
 ```bash
-make gw-build-android    # build the APK
-make gw-deploy-wifi      # install and launch over WiFi
-make adb-status          # check WiFi connection
-make adb-connect         # reconnect after Board reboot
+make gw-build-android && make gw-deploy-wifi   # build + ship, no cable
+make gw-logs-wifi                              # watch logs
+make screenshot                                # see the Board's screen
 ```
 
-**One-time setup** (requires USB cable the first time):
+Notes:
+- Pairing token lives at `~/.config/board-connect/tokens.json`, survives reboots
+- No Android developer options, no adb, no USB required — the old adb-over-TCP workflow is obsolete
+- Browser alternative: `http://<board-address>:8843/` accepts drag-and-drop APK installs
 
-1. Connect Board via USB-C cable
-2. `bdb launch com.android.settings` to open Android settings on the Board's screen
-3. Scroll to the bottom, tap **System**
-4. Tap **About phone**
-5. Tap **Build number** 7 times — you'll see "You are now a developer"
-6. Go back to **System** → **Developer options** (new menu item)
-7. Turn ON:
-   - **USB debugging**
-   - **Wireless debugging**
-   - **Disable ADB authorization timeout** (so you don't have to re-auth)
-8. A prompt will appear on the Board screen: "Allow USB debugging?" — tap **Always allow from this computer**, then **Allow**
-9. From your Mac, enable TCP mode and connect:
-   ```bash
-   ADB=/Applications/Unity/Hub/Editor/6000.3.8f1/PlaybackEngines/AndroidPlayer/SDK/platform-tools/adb
-   $ADB tcpip 5555
-   $ADB connect 192.168.1.203:5555   # Board IP (may change with DHCP)
-   ```
-10. Unplug the USB cable — WiFi deploy now works
+### USB Deploy (legacy fallback)
 
-**Notes:**
-- `bdb` only works over USB serial. `adb` works over USB or WiFi. They don't conflict.
-- After Board reboot, re-run `make adb-connect` to reconnect WiFi.
-- Board IP is currently `192.168.1.203` but may change if DHCP assigns a new address.
-- To find the Board's current IP: plug in USB, run `$ADB shell ip addr show wlan0`.
+1. Connect Board via USB-C accessory port (data-capable cable, not charge-only)
+2. `make bdb-status` to verify connection
+3. `make deploy` (or `make gw-deploy`)
 
 ## Conventions
 
 - Games: Unity/C#, one folder per game under `games/`
 - Tooling/scripts: Python (>=3.13)
 - Board SDK input: use `BoardInput.GetActiveContacts()` from `Board.Input` namespace
-- Build automation: Makefile per game project
-- Package name for pong: `fun.board.pong`
+- Desktop mouse fallback per game, runtime-gated (see Headless Dev Loop section)
+- Build automation: root Makefile, per-game target prefix
+- Package names: `fun.board.pong`, `fun.board.golfwall`
 
 ## New Machine Setup
 
-When setting up on a new machine:
 1. Install Unity Hub: `brew install --cask unity-hub`
 2. Install Unity with Android support: `yes | /Applications/Unity\ Hub.app/Contents/MacOS/Unity\ Hub -- --headless install --version 6000.3.8f1 --module android android-sdk-ndk-tools android-open-jdk`
 3. Accept Android SDK licenses: `yes | <Unity>/PlaybackEngines/AndroidPlayer/SDK/cmdline-tools/16.0/bin/sdkmanager --licenses --sdk_root=<Unity>/PlaybackEngines/AndroidPlayer/SDK` (set JAVA_HOME to Unity's OpenJDK)
-4. Fix bdb: `make bdb-fix`
-5. Update Board SDK path in `games/pong/Packages/manifest.json` (absolute path to `fun.board-3.2.1.tgz`)
-6. Run `make setup-scene` then `make build-android`
+4. `make connect-install` then pair with the Board (see deploy workflow)
+5. Run `make setup-scene` then `make build-android` (SDK package path is relative — no manifest edits)
+6. (USB fallback only) `make bdb-fix`
+
+## Official Docs
+
+- Developer docs: https://docs.dev.board.fun/ (Unity SDK v3.3.0, Godot + Web SDKs in beta)
+- board-connect: https://docs.dev.board.fun/tools/board-connect
+- Unity simulator (editor-only): https://docs.dev.board.fun/unity/simulator
+- AI assistant context for the SDK: https://docs.dev.board.fun/unity/ai-assistant
+- FAQ: https://docs.dev.board.fun/faq — Developer portal: https://dev.board.fun — Discord: https://discord.gg/KccHAYgykD
 
 ## Current Status
 
-- Pong deployed and running on Board hardware (Harris_Hill_Products B5438, OS 1.4.7)
-- Golf Wall deployed — golf game using glyph piece detection for swing input
+- Pong and Golf Wall deployed and running on Board hardware (Harris_Hill_Products B5438, OS 1.4.7)
 - Pause screen integration implemented (BoardApplication.Exit() + resume handling)
-- bdb CLI is working (signed and permissions fixed)
-- USB debugging and WiFi debugging enabled on Board (Developer options unlocked)
-- WiFi ADB confirmed working at 192.168.1.203:5555
+- Both games have desktop mouse fallbacks → `make sim` / `make gw-sim` run on the Mac
+- board-connect is the deploy path (WiFi); CLI install + pairing pending first run at the Board (see README To Do)
+- bdb (USB) still works as fallback; old adb-over-TCP WiFi workflow retired
 - Board does NOT need developer mode — the dev service runs automatically on all retail Boards
+- SDK 3.2.1 in use; 3.3.0 available on the portal (upgrade tracked in README To Do)

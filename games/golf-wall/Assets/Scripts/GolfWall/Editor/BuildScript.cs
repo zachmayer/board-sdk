@@ -20,8 +20,25 @@ namespace GolfWall.Editor
                 options = BuildOptions.None
             };
 
-            BuildReport report = BuildPipeline.BuildPlayer(options);
+            Report(BuildPipeline.BuildPlayer(options));
+        }
 
+        [MenuItem("Board/Golf Wall/Build macOS App")]
+        public static void BuildMac()
+        {
+            var options = new BuildPlayerOptions
+            {
+                scenes = Scenes,
+                locationPathName = "Build/GolfWall.app",
+                target = BuildTarget.StandaloneOSX,
+                options = BuildOptions.None
+            };
+
+            Report(BuildPipeline.BuildPlayer(options));
+        }
+
+        private static void Report(BuildReport report)
+        {
             if (report.summary.result == BuildResult.Succeeded)
             {
                 Debug.Log($"Build succeeded: {report.summary.outputPath}");

@@ -2,7 +2,8 @@
     "name": "GolfWall",
     "rootNamespace": "GolfWall",
     "references": [
-        "Board"
+        "Board",
+        "Unity.InputSystem"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
