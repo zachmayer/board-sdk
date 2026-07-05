@@ -4,6 +4,10 @@
 
 A monorepo for developing games for the [Board](https://board.fun) tabletop gaming platform. Board is a large touchscreen tabletop that runs Android and tracks both finger touches and physical game pieces (glyphs).
 
+## Git Workflow
+
+**Push directly to `main` for this repo** — no feature branch, worktree, or PR required. This intentionally overrides the global `~/CLAUDE.md` rule ("Never commit to main — open a PR"); Zach works solo here and wants fast iteration. Keep commits atomic with descriptive messages.
+
 ## Repo Structure
 
 ```
