@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.InputSystem;
 using Board.Input;
 using Board.Core;
 
@@ -59,10 +60,10 @@ namespace GolfWall
         // Shared white sprite for rectangles
         private Sprite whiteSprite;
 
-        // Editor debug: mouse-based swing simulation
-        private bool editorDebugMode;
-        private bool editorMouseDown;
-        private Vector3 editorDragStart;
+        // Desktop debug: mouse-based swing simulation (editor + Mac sim build)
+        private bool mouseDebugMode;
+        private bool mouseDown;
+        private Vector3 mouseDragStart;
 
         private void Awake()
         {
@@ -95,11 +96,15 @@ namespace GolfWall
             BoardApplication.SetPauseScreenContext(applicationName: "Golf Wall");
             BoardApplication.pauseScreenActionReceived += OnPauseAction;
 
-            // Editor debug mode: enable mouse-based input when no Board hardware
-            editorDebugMode = Application.isEditor;
+            // Mouse debug mode: mouse-based input when running on desktop (editor
+            // play mode + the make gw-sim Mac build). Board hardware uses glyphs.
+            mouseDebugMode = Application.isEditor ||
+                Application.platform == RuntimePlatform.OSXPlayer ||
+                Application.platform == RuntimePlatform.WindowsPlayer ||
+                Application.platform == RuntimePlatform.LinuxPlayer;
 
             UpdateScoreDisplay();
-            if (editorDebugMode)
+            if (mouseDebugMode)
                 ShowMessage("Click & drag from ball\nto aim, release to launch");
             else
                 ShowMessage("Place robot piece\nnear the ball");
@@ -294,9 +299,9 @@ namespace GolfWall
 
         private void Update()
         {
-            if (editorDebugMode)
+            if (mouseDebugMode)
             {
-                ProcessEditorInput();
+                ProcessMouseInput();
                 return;
             }
 
@@ -328,39 +333,42 @@ namespace GolfWall
         }
 
         /// <summary>
-        /// Editor-only mouse input: click on ball to start drag, release to launch.
+        /// Desktop mouse input: click on ball to start drag, release to launch.
         /// Drag direction and length determine launch angle and power.
-        /// A dotted line shows the aim trajectory while dragging.
+        /// Uses the Input System package (legacy Input is disabled in Player Settings).
         /// </summary>
-        private void ProcessEditorInput()
+        private void ProcessMouseInput()
         {
             if (state == GameState.BallInFlight) return;
 
-            // Auto-transition to ReadyToSwing in editor (no piece needed)
+            // Auto-transition to ReadyToSwing (no piece needed with a mouse)
             if (state == GameState.WaitingToStart)
             {
                 state = GameState.ReadyToSwing;
                 ShowMessage("Click & drag from ball\nto aim, release to launch");
             }
 
-            Vector3 mouseWorld = mainCamera.ScreenToWorldPoint(Input.mousePosition);
+            var mouse = Mouse.current;
+            if (mouse == null) return;
+
+            Vector3 mouseWorld = mainCamera.ScreenToWorldPoint(mouse.position.ReadValue());
             mouseWorld.z = 0;
 
-            if (Input.GetMouseButtonDown(0))
+            if (mouse.leftButton.wasPressedThisFrame)
             {
                 // Start drag if near the ball/tee
                 float dist = Vector2.Distance(mouseWorld, teePosition);
                 if (dist < 1.5f)
                 {
-                    editorMouseDown = true;
-                    editorDragStart = mouseWorld;
+                    mouseDown = true;
+                    mouseDragStart = mouseWorld;
                 }
             }
 
-            if (Input.GetMouseButtonUp(0) && editorMouseDown)
+            if (mouse.leftButton.wasReleasedThisFrame && mouseDown)
             {
-                editorMouseDown = false;
-                Vector2 dragVec = (Vector2)(mouseWorld - editorDragStart);
+                mouseDown = false;
+                Vector2 dragVec = (Vector2)(mouseWorld - mouseDragStart);
 
                 // Launch in the direction of drag
                 float dragLen = dragVec.magnitude;
@@ -383,7 +391,7 @@ namespace GolfWall
                     dir = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
 
                     Vector2 launchVelocity = dir * speed;
-                    Debug.Log($"[GolfWall][Editor] Launch: speed={speed:F1} angle={angle * Mathf.Rad2Deg:F0}° " +
+                    Debug.Log($"[GolfWall][Mouse] Launch: speed={speed:F1} angle={angle * Mathf.Rad2Deg:F0}° " +
                         $"vel=({launchVelocity.x:F1},{launchVelocity.y:F1})");
 
                     ball.Launch(teePosition, launchVelocity);
@@ -662,7 +670,7 @@ namespace GolfWall
             UpdateScoreDisplay();
             wall.SetWallForScore(score);
             ball.Stop();
-            state = editorDebugMode ? GameState.WaitingToStart : GameState.ReadyToSwing;
+            state = mouseDebugMode ? GameState.WaitingToStart : GameState.ReadyToSwing;
             ShowMessage($"Nice shot!\nScore: {score}");
             PlaySound(scoreSound);
 
@@ -675,7 +683,7 @@ namespace GolfWall
         private void BallMissed()
         {
             ball.Stop();
-            state = editorDebugMode ? GameState.WaitingToStart : GameState.ReadyToSwing;
+            state = mouseDebugMode ? GameState.WaitingToStart : GameState.ReadyToSwing;
             ShowMessage("Missed! Try again!");
 
             // Reset ball to tee

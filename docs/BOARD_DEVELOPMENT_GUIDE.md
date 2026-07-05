@@ -7,6 +7,12 @@
 
 This document captures everything learned from a Board development session, including setup, tooling, code architecture, and lessons learned.
 
+> **UPDATE (July 2026):** The deploy sections below predate **board-connect**, Board's
+> official WiFi deploy CLI that supersedes `bdb` (now legacy). See `CLAUDE.md` and
+> [docs.dev.board.fun/tools/board-connect](https://docs.dev.board.fun/tools/board-connect)
+> for the current workflow. The in-editor simulator docs are still accurate; for
+> GUI-free local testing use the desktop mouse fallback (`make sim` / `make gw-sim`).
+
 ---
 
 ## Table of Contents

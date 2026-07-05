@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.InputSystem;
 using Board.Input;
 using Board.Core;
 using System.Collections.Generic;
@@ -26,6 +27,7 @@ namespace Pong
 
         private Camera mainCamera;
         private Dictionary<int, int> contactToPaddle = new Dictionary<int, int>();
+        private bool mouseInputEnabled;
 
         private enum GameState { WaitingToStart, Playing, GameOver }
         private GameState state = GameState.WaitingToStart;
@@ -49,6 +51,12 @@ namespace Pong
             // Calculate play area from camera
             playAreaHeight = mainCamera.orthographicSize * 2f;
             playAreaWidth = playAreaHeight * mainCamera.aspect;
+
+            // Mouse fallback for desktop testing (editor play mode + the make-sim Mac build).
+            mouseInputEnabled = Application.isEditor ||
+                Application.platform == RuntimePlatform.OSXPlayer ||
+                Application.platform == RuntimePlatform.WindowsPlayer ||
+                Application.platform == RuntimePlatform.LinuxPlayer;
 
             // Create game objects
             CreateGameObjects();
@@ -273,6 +281,18 @@ namespace Pong
                         }
                         break;
                 }
+            }
+
+            // Desktop mouse fallback: left-drag controls the paddle on that side.
+            // Inert on Board hardware (no mouse device exists there).
+            if (mouseInputEnabled && Mouse.current != null && Mouse.current.leftButton.isPressed)
+            {
+                Vector2 mousePos = Mouse.current.position.ReadValue();
+                Vector3 worldPos = mainCamera.ScreenToWorldPoint(new Vector3(mousePos.x, mousePos.y, 10));
+                int paddleIndex = worldPos.x < 0 ? 0 : 1;
+                PongPaddle paddle = paddleIndex == 0 ? leftPaddle : rightPaddle;
+                paddle.SetTargetPosition(worldPos.y);
+                activePaddles.Add(paddleIndex);
             }
 
             // Release control for paddles not being touched
