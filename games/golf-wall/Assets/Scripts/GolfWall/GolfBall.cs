@@ -27,7 +27,7 @@ namespace GolfWall
                 spriteRenderer = gameObject.AddComponent<SpriteRenderer>();
 
             spriteRenderer.sprite = CreateCircleSprite();
-            spriteRenderer.color = settings.ballColor;
+            spriteRenderer.color = Color.white; // fill + outline are baked into the sprite
             transform.localScale = Vector3.one * settings.ballSize;
 
             previousPosition = transform.position;
@@ -112,7 +112,9 @@ namespace GolfWall
         {
             int size = 64;
             Texture2D texture = new Texture2D(size, size);
+            texture.filterMode = FilterMode.Bilinear;
             float radius = size / 2f;
+            float rim = 4f; // outline thickness in px
             Vector2 center = new Vector2(radius, radius);
 
             for (int y = 0; y < size; y++)
@@ -120,7 +122,11 @@ namespace GolfWall
                 for (int x = 0; x < size; x++)
                 {
                     float dist = Vector2.Distance(new Vector2(x, y), center);
-                    texture.SetPixel(x, y, dist < radius - 1 ? Color.white : Color.clear);
+                    Color c;
+                    if (dist > radius - 1) c = Color.clear;
+                    else if (dist > radius - 1 - rim) c = GolfWallPalette.BallOutline;
+                    else c = GolfWallPalette.Ball;
+                    texture.SetPixel(x, y, c);
                 }
             }
 

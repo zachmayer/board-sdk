@@ -77,6 +77,10 @@ namespace GolfWall
         [Range(0.05f, 1f)]
         public float growthRate = 0.2f;
 
+        [Tooltip("Max wall height as fraction of screen height — capped so a good shot can always clear it (keeps runs winnable)")]
+        [Range(0.4f, 0.95f)]
+        public float maxHeightFraction = 0.62f;
+
         [Header("Player Settings")]
         [Tooltip("Radius for detecting ball-piece collision")]
         [Range(0.3f, 1.5f)]

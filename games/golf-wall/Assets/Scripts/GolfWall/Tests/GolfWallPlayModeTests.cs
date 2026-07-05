@@ -27,6 +27,7 @@ namespace GolfWall.Tests
             settings.initialHeightFraction = 0.25f;
             settings.wallThickness = 0.6f;
             settings.growthRate = 0.2f;
+            settings.maxHeightFraction = 0.62f;
             settings.hitDetectionRadius = 0.8f;
             settings.wallXFraction = 0.67f;
             settings.wallColor = Color.gray;
@@ -179,7 +180,7 @@ namespace GolfWall.Tests
                 "Wall should be at wallXFraction position");
 
             float expectedHeight = Wall.CalculateWallHeight(0, playAreaHeight,
-                settings.initialHeightFraction, settings.growthRate, settings.ballSize);
+                settings.initialHeightFraction, settings.growthRate, settings.maxHeightFraction);
             float expectedTopY = -playAreaHeight / 2f + expectedHeight;
             Assert.AreEqual(expectedTopY, wall.WallTopY, 0.01f,
                 "Wall top should be at expected Y for score 0");

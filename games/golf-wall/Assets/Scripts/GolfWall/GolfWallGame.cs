@@ -11,11 +11,14 @@ namespace GolfWall
         [SerializeField] private GolfWallSettings settings;
         [SerializeField] private Text scoreText;
         [SerializeField] private Text messageText;
+        private Text bestText;
 
         private GolfBall ball;
         private Wall wall;
 
         private int score;
+        private int bestScore;
+        private const string BestScoreKey = "GolfWall.BestScore";
         private float playAreaWidth;
         private float playAreaHeight;
         private Camera mainCamera;
@@ -103,7 +106,9 @@ namespace GolfWall
                 Application.platform == RuntimePlatform.WindowsPlayer ||
                 Application.platform == RuntimePlatform.LinuxPlayer;
 
+            bestScore = PlayerPrefs.GetInt(BestScoreKey, 0);
             UpdateScoreDisplay();
+            UpdateBestDisplay();
             if (mouseDebugMode)
                 ShowMessage("Click & drag from ball\nto aim, release to launch");
             else
@@ -170,7 +175,7 @@ namespace GolfWall
             ringObj.transform.SetParent(pieceIndicator.transform, false);
             var ringRenderer = ringObj.AddComponent<SpriteRenderer>();
             ringRenderer.sprite = CreateRingSprite();
-            ringRenderer.color = settings.pieceIndicatorColor;
+            ringRenderer.color = GolfWallPalette.Ring;
             ringObj.transform.localScale = Vector3.one * settings.hitDetectionRadius * 2f;
 
             // Club child (rectangle extending from ring edge)
@@ -178,7 +183,7 @@ namespace GolfWall
             clubObject.transform.SetParent(pieceIndicator.transform, false);
             var clubRenderer = clubObject.AddComponent<SpriteRenderer>();
             clubRenderer.sprite = whiteSprite;
-            clubRenderer.color = settings.clubColor;
+            clubRenderer.color = GolfWallPalette.Club;
             clubRenderer.sortingOrder = 1;
             // Scale: club length x club width (in world units, parent has no scale)
             clubObject.transform.localScale = new Vector3(settings.clubLength, settings.clubWidth, 1);
@@ -201,7 +206,7 @@ namespace GolfWall
             teeObject = new GameObject("Tee");
             var renderer = teeObject.AddComponent<SpriteRenderer>();
             renderer.sprite = whiteSprite;
-            renderer.color = settings.teeColor;
+            renderer.color = GolfWallPalette.Tee;
             renderer.sortingOrder = -1;
 
             teeObject.transform.localScale = new Vector3(0.08f, settings.teeHeight, 1);
@@ -216,85 +221,132 @@ namespace GolfWall
 
         private void CreateBackground()
         {
-            // Try to load Kenney pixel art backgrounds
-            Texture2D bg0 = Resources.Load<Texture2D>("Sprites/bg_green_0");
-            Texture2D bg1 = Resources.Load<Texture2D>("Sprites/bg_green_1");
-            Texture2D bg2 = Resources.Load<Texture2D>("Sprites/bg_green_2");
+            CreateGradientSky();
+            CreateClouds();
+            CreateGround();
+        }
+
+        /// <summary>Full-screen vertical gradient sky (smooth, fills the whole camera view).</summary>
+        private void CreateGradientSky()
+        {
+            const int gh = 256;
+            Texture2D tex = new Texture2D(1, gh);
+            tex.wrapMode = TextureWrapMode.Clamp;
+            tex.filterMode = FilterMode.Bilinear;
+            for (int y = 0; y < gh; y++)
+            {
+                float fromTop = 1f - (float)y / (gh - 1); // top of screen -> stop 0
+                tex.SetPixel(0, y, SampleGradient(GolfWallPalette.Sky, fromTop));
+            }
+            tex.Apply();
+
+            var skyObj = new GameObject("Sky");
+            var sr = skyObj.AddComponent<SpriteRenderer>();
+            // ppu=1 -> raw sprite is 1 x gh world units; stretch to fill the play area.
+            sr.sprite = Sprite.Create(tex, new Rect(0, 0, 1, gh), new Vector2(0.5f, 0.5f), 1f);
+            sr.sortingOrder = -100;
+            skyObj.transform.position = Vector3.zero;
+            skyObj.transform.localScale = new Vector3(playAreaWidth, playAreaHeight / gh, 1f);
+
+            mainCamera.clearFlags = CameraClearFlags.SolidColor;
+            mainCamera.backgroundColor = GolfWallPalette.Sky[0];
+        }
+
+        /// <summary>Pixel grass+dirt ground band anchored to the bottom of the screen.</summary>
+        private void CreateGround()
+        {
             Texture2D grassTex = Resources.Load<Texture2D>("Sprites/grass");
             Texture2D dirtTex = Resources.Load<Texture2D>("Sprites/dirt");
+            if (grassTex == null || dirtTex == null) return;
 
-            if (bg0 != null && bg1 != null && bg2 != null)
+            const float worldTile = 0.6f; // world size of one source tile
+            const int dirtRows = 2;
+            int rowsY = 1 + dirtRows; // grass on top, dirt below
+            int tileSize = grassTex.width; // 18px
+            int tilesX = Mathf.CeilToInt(playAreaWidth / worldTile) + 1;
+
+            int texW = tilesX * tileSize;
+            int texH = rowsY * tileSize;
+            Texture2D tex = new Texture2D(texW, texH);
+            tex.filterMode = FilterMode.Point;
+
+            Color[] grass = grassTex.GetPixels();
+            Color[] dirt = dirtTex.GetPixels();
+            for (int ty = 0; ty < rowsY; ty++)
             {
-                // Build composite background: 3 bands tiled horizontally
-                int tileSize = bg0.width; // 18px
-                int tilesX = Mathf.CeilToInt(playAreaWidth * 36f / tileSize) + 2;
-                int bandHeight = tileSize;
-                int texW = tilesX * tileSize;
-                int texH = bandHeight * 3;
-
-                Texture2D bgTex = new Texture2D(texW, texH);
-                bgTex.filterMode = FilterMode.Point;
-
-                Color[] pixels0 = bg0.GetPixels();
-                Color[] pixels1 = bg1.GetPixels();
-                Color[] pixels2 = bg2.GetPixels();
-
+                Color[] row = (ty == rowsY - 1) ? grass : dirt; // top row = grass
                 for (int tx = 0; tx < tilesX; tx++)
-                {
-                    bgTex.SetPixels(tx * tileSize, bandHeight * 2, tileSize, tileSize, pixels0); // top
-                    bgTex.SetPixels(tx * tileSize, bandHeight * 1, tileSize, tileSize, pixels1); // mid
-                    bgTex.SetPixels(tx * tileSize, 0, tileSize, tileSize, pixels2); // bottom
-                }
-                bgTex.Apply();
-
-                float ppu = texW / playAreaWidth;
-                var bgObj = new GameObject("Background");
-                var bgRenderer = bgObj.AddComponent<SpriteRenderer>();
-                bgRenderer.sprite = Sprite.Create(bgTex, new Rect(0, 0, texW, texH),
-                    new Vector2(0.5f, 0.5f), ppu);
-                bgRenderer.sortingOrder = -10;
-                bgObj.transform.position = new Vector3(0, 0, 0);
-
-                mainCamera.clearFlags = CameraClearFlags.SolidColor;
-                // Use the sky color from the top tile as camera clear color
-                mainCamera.backgroundColor = bg0.GetPixel(tileSize / 2, tileSize / 2);
+                    tex.SetPixels(tx * tileSize, ty * tileSize, tileSize, tileSize, row);
             }
-            else
+            tex.Apply();
+
+            float ppu = tileSize / worldTile;
+            var obj = new GameObject("Ground");
+            var sr = obj.AddComponent<SpriteRenderer>();
+            sr.sprite = Sprite.Create(tex, new Rect(0, 0, texW, texH),
+                new Vector2(0.5f, 0f), ppu); // pivot bottom-center
+            sr.sortingOrder = -5;
+            obj.transform.position = new Vector3(0, -playAreaHeight / 2f, 0);
+        }
+
+        /// <summary>Soft, semi-transparent clouds to give the sky depth and charm.</summary>
+        private void CreateClouds()
+        {
+            Sprite cloud = CreateCloudSprite();
+            float top = playAreaHeight / 2f;
+            float w = playAreaWidth;
+            float baseW = 160f / 100f; // cloud sprite world width at scale 1
+            // xFrac (of width), yFrac (of top), widthFrac (of playAreaWidth), alpha
+            float[,] specs =
             {
-                mainCamera.backgroundColor = settings.backgroundColor;
-                mainCamera.clearFlags = CameraClearFlags.SolidColor;
-            }
-
-            // Ground strip using grass + dirt tiles
-            if (grassTex != null && dirtTex != null)
+                { -0.30f, 0.58f, 0.20f, 0.80f },
+                {  0.24f, 0.72f, 0.26f, 0.65f },
+                {  0.06f, 0.38f, 0.15f, 0.55f },
+                { -0.40f, 0.30f, 0.17f, 0.50f },
+            };
+            for (int i = 0; i < specs.GetLength(0); i++)
             {
-                int tileSize = grassTex.width;
-                int tilesX = Mathf.CeilToInt(playAreaWidth * 36f / tileSize) + 2;
-                int texW = tilesX * tileSize;
-                int texH = tileSize * 2; // grass on top, dirt below
-
-                Texture2D groundTex = new Texture2D(texW, texH);
-                groundTex.filterMode = FilterMode.Point;
-
-                Color[] grassPixels = grassTex.GetPixels();
-                Color[] dirtPixels = dirtTex.GetPixels();
-
-                for (int tx = 0; tx < tilesX; tx++)
-                {
-                    groundTex.SetPixels(tx * tileSize, tileSize, tileSize, tileSize, grassPixels);
-                    groundTex.SetPixels(tx * tileSize, 0, tileSize, tileSize, dirtPixels);
-                }
-                groundTex.Apply();
-
-                float ppu = texW / playAreaWidth;
-                float groundHeight = (float)texH / ppu;
-                var groundObj = new GameObject("Ground");
-                var groundRenderer = groundObj.AddComponent<SpriteRenderer>();
-                groundRenderer.sprite = Sprite.Create(groundTex, new Rect(0, 0, texW, texH),
-                    new Vector2(0.5f, 1f), ppu); // pivot at top center
-                groundRenderer.sortingOrder = -5;
-                groundObj.transform.position = new Vector3(0, -playAreaHeight / 2f, 0);
+                var o = new GameObject("Cloud");
+                var sr = o.AddComponent<SpriteRenderer>();
+                sr.sprite = cloud;
+                sr.color = new Color(1f, 1f, 1f, specs[i, 3]);
+                sr.sortingOrder = -50;
+                o.transform.position = new Vector3(w * specs[i, 0], top * specs[i, 1], 0);
+                o.transform.localScale = Vector3.one * (w * specs[i, 2] / baseW);
             }
+        }
+
+        /// <summary>A soft elliptical white blob used as a distant cloud.</summary>
+        private Sprite CreateCloudSprite()
+        {
+            int cw = 160, ch = 70;
+            Texture2D tex = new Texture2D(cw, ch);
+            tex.filterMode = FilterMode.Bilinear;
+            tex.wrapMode = TextureWrapMode.Clamp;
+            Vector2 c = new Vector2(cw / 2f, ch / 2f);
+            for (int y = 0; y < ch; y++)
+            {
+                for (int x = 0; x < cw; x++)
+                {
+                    float dx = (x - c.x) / (cw * 0.5f);
+                    float dy = (y - c.y) / (ch * 0.5f);
+                    float d = Mathf.Sqrt(dx * dx + dy * dy);
+                    float a = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(1f - d));
+                    tex.SetPixel(x, y, new Color(1f, 1f, 1f, a));
+                }
+            }
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, cw, ch), new Vector2(0.5f, 0.5f), 100f);
+        }
+
+        /// <summary>Sample a multi-stop gradient. t=0 -> stops[0], t=1 -> stops[last].</summary>
+        private static Color SampleGradient(Color[] stops, float t)
+        {
+            t = Mathf.Clamp01(t);
+            float s = t * (stops.Length - 1);
+            int i = Mathf.FloorToInt(s);
+            if (i >= stops.Length - 1) return stops[stops.Length - 1];
+            return Color.Lerp(stops[i], stops[i + 1], s - i);
         }
 
         private void Update()
@@ -668,6 +720,14 @@ namespace GolfWall
         {
             score++;
             UpdateScoreDisplay();
+            if (score > bestScore)
+            {
+                bestScore = score;
+                PlayerPrefs.SetInt(BestScoreKey, bestScore);
+                PlayerPrefs.Save();
+                UpdateBestDisplay();
+            }
+            StartCoroutine(ScorePop());
             wall.SetWallForScore(score);
             ball.Stop();
             state = mouseDebugMode ? GameState.WaitingToStart : GameState.ReadyToSwing;
@@ -698,6 +758,28 @@ namespace GolfWall
                 scoreText.text = $"Score: {score}";
         }
 
+        private void UpdateBestDisplay()
+        {
+            if (bestText != null)
+                bestText.text = bestScore > 0 ? $"Best: {bestScore}" : "";
+        }
+
+        /// <summary>Quick scale punch on the score text for a bit of juice on each point.</summary>
+        private System.Collections.IEnumerator ScorePop()
+        {
+            if (scoreText == null) yield break;
+            Transform t = scoreText.transform;
+            const float dur = 0.22f;
+            for (float e = 0f; e < dur; e += Time.deltaTime)
+            {
+                float k = e / dur;
+                float s = 1f + 0.35f * (1f - k) * Mathf.Sin(k * Mathf.PI);
+                t.localScale = new Vector3(s, s, 1f);
+                yield return null;
+            }
+            t.localScale = Vector3.one;
+        }
+
         private void ShowMessage(string message)
         {
             if (messageText != null)
@@ -715,7 +797,8 @@ namespace GolfWall
             scoreObj.transform.SetParent(canvasObj.transform, false);
             scoreText = scoreObj.AddComponent<Text>();
             scoreText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            scoreText.fontSize = 48;
+            scoreText.fontSize = 54;
+            scoreText.fontStyle = FontStyle.Bold;
             scoreText.alignment = TextAnchor.MiddleCenter;
             scoreText.color = Color.white;
             RectTransform scoreRect = scoreText.rectTransform;
@@ -728,7 +811,8 @@ namespace GolfWall
             msgObj.transform.SetParent(canvasObj.transform, false);
             messageText = msgObj.AddComponent<Text>();
             messageText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            messageText.fontSize = 32;
+            messageText.fontSize = 36;
+            messageText.fontStyle = FontStyle.Bold;
             messageText.alignment = TextAnchor.MiddleCenter;
             messageText.color = Color.white;
             RectTransform msgRect = messageText.rectTransform;
@@ -736,6 +820,32 @@ namespace GolfWall
             msgRect.anchorMax = new Vector2(0.8f, 0.6f);
             msgRect.offsetMin = Vector2.zero;
             msgRect.offsetMax = Vector2.zero;
+
+            GameObject bestObj = new GameObject("BestText");
+            bestObj.transform.SetParent(canvasObj.transform, false);
+            bestText = bestObj.AddComponent<Text>();
+            bestText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            bestText.fontSize = 30;
+            bestText.fontStyle = FontStyle.Bold;
+            bestText.alignment = TextAnchor.UpperLeft;
+            bestText.color = Color.white;
+            RectTransform bestRect = bestText.rectTransform;
+            bestRect.anchorMin = new Vector2(0.02f, 0.9f);
+            bestRect.anchorMax = new Vector2(0.32f, 1f);
+            bestRect.offsetMin = Vector2.zero;
+            bestRect.offsetMax = Vector2.zero;
+
+            AddTextOutline(scoreObj);
+            AddTextOutline(msgObj);
+            AddTextOutline(bestObj);
+        }
+
+        /// <summary>Dark outline so white UI text stays readable on any background.</summary>
+        private static void AddTextOutline(GameObject go)
+        {
+            var outline = go.AddComponent<Outline>();
+            outline.effectColor = GolfWallPalette.TextOutline;
+            outline.effectDistance = new Vector2(2.5f, -2.5f);
         }
 
         private void CreateAudio()
@@ -822,5 +932,30 @@ namespace GolfWall
             texture.Apply();
             return Sprite.Create(texture, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
         }
+    }
+
+    /// <summary>
+    /// Central color palette — "Clear Day": cool gradient sky so the warm pixel
+    /// foreground (grass, brick) pops, with high-contrast readable accents.
+    /// Defined in code (not the .asset) so the whole look tunes in one place.
+    /// </summary>
+    public static class GolfWallPalette
+    {
+        // Sky gradient, top of screen -> horizon.
+        public static readonly Color[] Sky =
+        {
+            new Color32(0x17, 0x34, 0x63, 255), // deep blue (top)
+            new Color32(0x35, 0x6F, 0xB0, 255), // azure
+            new Color32(0x7B, 0xB8, 0xDE, 255), // sky blue
+            new Color32(0xC9, 0xE3, 0xE8, 255), // pale
+            new Color32(0xFC, 0xE6, 0xBE, 255), // warm horizon (golden hour)
+        };
+
+        public static readonly Color Ball        = new Color32(0xFF, 0xFB, 0xEF, 255); // warm cream
+        public static readonly Color BallOutline = new Color32(0x2A, 0x3A, 0x4A, 255); // dark rim
+        public static readonly Color Tee         = new Color32(0x4A, 0x33, 0x28, 255); // dark wood
+        public static readonly Color Club        = new Color32(0xFF, 0xC9, 0x3C, 255); // gold
+        public static readonly Color Ring        = new Color32(0xFF, 0x70, 0x43, 110); // coral, translucent
+        public static readonly Color TextOutline = new Color32(0x13, 0x22, 0x41, 230); // navy
     }
 }

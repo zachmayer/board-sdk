@@ -56,7 +56,7 @@ namespace GolfWall
         {
             float halfHeight = playAreaHeight / 2f;
             currentHeight = CalculateWallHeight(score, playAreaHeight, settings.initialHeightFraction,
-                settings.growthRate, settings.ballSize);
+                settings.growthRate, settings.maxHeightFraction);
 
             // Build a tiled brick texture for the wall
             int tileSize = brickTex.width; // 18px
@@ -97,13 +97,13 @@ namespace GolfWall
         /// <summary>
         /// Pure static function for unit testing.
         /// Returns the wall height in world units for a given score.
-        /// Grows asymptotically from initial toward max (full screen height minus one ball).
+        /// Grows asymptotically from initial toward max (maxHeightFraction of screen height, kept clearable).
         /// </summary>
         public static float CalculateWallHeight(int score, float playAreaHeight, float initialHeightFraction,
-            float growthRate, float ballSize)
+            float growthRate, float maxHeightFraction)
         {
             float initialHeight = initialHeightFraction * playAreaHeight;
-            float maxHeight = playAreaHeight - ballSize;
+            float maxHeight = maxHeightFraction * playAreaHeight;
 
             // Asymptotic: height = max - (max - initial) / (1 + score * rate)
             return maxHeight - (maxHeight - initialHeight) / (1f + score * growthRate);

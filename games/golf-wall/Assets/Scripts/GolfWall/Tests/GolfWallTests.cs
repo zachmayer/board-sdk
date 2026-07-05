@@ -21,6 +21,7 @@ namespace GolfWall.Tests
             settings.initialHeightFraction = 0.25f;
             settings.wallThickness = 0.6f;
             settings.growthRate = 0.2f;
+            settings.maxHeightFraction = 0.62f;
             settings.hitDetectionRadius = 0.8f;
             return settings;
         }
@@ -31,9 +32,9 @@ namespace GolfWall.Tests
             float playAreaHeight = 10f;
             float initialFraction = 0.4f;
             float growthRate = 0.2f;
-            float ballSize = 0.4f;
+            float maxFraction = 0.62f;
 
-            float height = Wall.CalculateWallHeight(0, playAreaHeight, initialFraction, growthRate, ballSize);
+            float height = Wall.CalculateWallHeight(0, playAreaHeight, initialFraction, growthRate, maxFraction);
 
             float expectedHeight = initialFraction * playAreaHeight;
             Assert.AreEqual(expectedHeight, height, 0.01f, "Wall at score 0 should be at initial height");
@@ -45,11 +46,11 @@ namespace GolfWall.Tests
             float playAreaHeight = 10f;
             float initialFraction = 0.4f;
             float growthRate = 0.2f;
-            float ballSize = 0.4f;
+            float maxFraction = 0.62f;
 
-            float h0 = Wall.CalculateWallHeight(0, playAreaHeight, initialFraction, growthRate, ballSize);
-            float h5 = Wall.CalculateWallHeight(5, playAreaHeight, initialFraction, growthRate, ballSize);
-            float h10 = Wall.CalculateWallHeight(10, playAreaHeight, initialFraction, growthRate, ballSize);
+            float h0 = Wall.CalculateWallHeight(0, playAreaHeight, initialFraction, growthRate, maxFraction);
+            float h5 = Wall.CalculateWallHeight(5, playAreaHeight, initialFraction, growthRate, maxFraction);
+            float h10 = Wall.CalculateWallHeight(10, playAreaHeight, initialFraction, growthRate, maxFraction);
 
             Assert.Greater(h5, h0, "Wall should be taller at score 5 than score 0");
             Assert.Greater(h10, h5, "Wall should be taller at score 10 than score 5");
@@ -61,12 +62,12 @@ namespace GolfWall.Tests
             float playAreaHeight = 10f;
             float initialFraction = 0.4f;
             float growthRate = 0.2f;
-            float ballSize = 0.4f;
-            float maxHeight = playAreaHeight - ballSize;
+            float maxFraction = 0.62f;
+            float maxHeight = maxFraction * playAreaHeight;
 
             for (int score = 0; score <= 1000; score += 50)
             {
-                float h = Wall.CalculateWallHeight(score, playAreaHeight, initialFraction, growthRate, ballSize);
+                float h = Wall.CalculateWallHeight(score, playAreaHeight, initialFraction, growthRate, maxFraction);
                 Assert.LessOrEqual(h, maxHeight, $"Wall at score {score} should not exceed max height ({maxHeight})");
             }
         }
@@ -77,10 +78,10 @@ namespace GolfWall.Tests
             float playAreaHeight = 10f;
             float initialFraction = 0.4f;
             float growthRate = 0.2f;
-            float ballSize = 0.4f;
-            float maxHeight = playAreaHeight - ballSize;
+            float maxFraction = 0.62f;
+            float maxHeight = maxFraction * playAreaHeight;
 
-            float hHigh = Wall.CalculateWallHeight(1000, playAreaHeight, initialFraction, growthRate, ballSize);
+            float hHigh = Wall.CalculateWallHeight(1000, playAreaHeight, initialFraction, growthRate, maxFraction);
 
             Assert.AreEqual(maxHeight, hHigh, 0.05f, "Wall should asymptote near max at very high scores");
         }
