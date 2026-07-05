@@ -165,9 +165,8 @@ gw-clean: ## Remove Golf Wall build artifacts
 # ============================================================
 
 connect-install: ## Install/update the board-connect CLI (official installer)
-	@mkdir -p $(SCRATCH)
-	curl -fsSL https://dev.board.fun/connect/install -o $(SCRATCH)/board-connect-install.sh
-	sh $(SCRATCH)/board-connect-install.sh
+	curl -fsSL https://dev.board.fun/connect/install | sh
+	$(BC) --version
 
 connect-ls: ## Discover Boards on the local network
 	$(BC) ls
