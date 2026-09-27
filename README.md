@@ -8,8 +8,8 @@ Games for the [Board](https://board.fun) tabletop gaming platform.
 |------|---------|--------|
 | [Pong](games/pong/) | `fun.board.pong` | Deployed and playable on Board hardware |
 | [Golf Wall](games/golf-wall/) | `fun.board.golfwall` | Deployed — glyph-piece swing input |
-| [Pool Panic](https://github.com/zachmayer/pool-panic) | `fun.board.poolpanic` | Own repo — pixel-art lane dodger (swipe, jump, dive) |
-| [Flying Hamsters](https://github.com/zachmayer/flying-hamsters) | — | Own repo — idea, parked |
+| [Pool Panic](https://github.com/zachmayer/pool-panic) | `fun.board.poolpanic` | Own repo — one swimmer vs. the deck: drag to swim, flick to jump or dive; deck players throw pool toys |
+| [Flying Hamsters](https://github.com/zachmayer/flying-hamsters) | `fun.board.flyinghamsters` | Own repo — 1–2 players: slide a piece to fly, lift and place to pounce |
 
 ## The Dev Loop (fully headless)
 
