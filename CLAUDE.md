@@ -15,7 +15,8 @@ board-sdk/
 ├── bin/                    # Shared tools
 │   └── bdb                 # Board Developer Bridge CLI (legacy, USB-only)
 ├── docs/                   # Board platform development docs
-│   └── BOARD_DEVELOPMENT_GUIDE.md  # Feb 2026 session guide (deploy sections predate board-connect)
+│   ├── BOARD_DEVELOPMENT_GUIDE.md  # Feb 2026 session guide (deploy sections predate board-connect)
+│   └── garden/             # Bloom (garden game) design doc + build plan; not built yet
 ├── games/                  # Game projects (each is a Unity project)
 │   ├── pong/               # Pong (Unity 6, C#) — fun.board.pong
 │   └── golf-wall/          # Golf Wall (Unity 6, C#) — fun.board.golfwall

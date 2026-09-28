@@ -10,6 +10,7 @@ Games for the [Board](https://board.fun) tabletop gaming platform.
 | [Golf Wall](games/golf-wall/) | `fun.board.golfwall` | Deployed — glyph-piece swing input |
 | [Pool Panic](https://github.com/zachmayer/pool-panic) | `fun.board.poolpanic` | Own repo — one swimmer vs. the deck: drag to swim, flick to jump or dive; deck players throw pool toys |
 | [Flying Hamsters](https://github.com/zachmayer/flying-hamsters) | `fun.board.flyinghamsters` | Own repo — 1–2 players: slide a piece to fly, lift and place to pounce |
+| [Bloom](docs/garden/DESIGN.md) (working title) | — | Design only — cozy co-op garden with the Mushka pieces: plant, tend, harvest, and grow the garden each winter |
 
 ## The Dev Loop (fully headless)
 
@@ -63,5 +64,6 @@ data-capable USB-C cable.
 
 - `CLAUDE.md` — development conventions, CLI reference, gotchas
 - `docs/BOARD_DEVELOPMENT_GUIDE.md` — Feb 2026 session guide (deploy sections predate board-connect)
+- `docs/garden/DESIGN.md` and `docs/garden/BUILD.md` — design doc and build plan for Bloom, a garden game on the Mushka pieces
 - [Board Developer Docs](https://docs.dev.board.fun/) — official: [Unity quick start](https://docs.dev.board.fun/unity/getting-started/quick-start), [simulator](https://docs.dev.board.fun/unity/simulator), [board-connect](https://docs.dev.board.fun/tools/board-connect), [AI assistant context](https://docs.dev.board.fun/unity/ai-assistant)
 - [Board Discord](https://discord.gg/KccHAYgykD) — developer community
